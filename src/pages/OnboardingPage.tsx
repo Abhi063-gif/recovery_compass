@@ -1,25 +1,19 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Calendar,
   Check,
   ChevronRight,
   ChevronLeft,
-  Shield,
   Heart,
   User,
   AlertTriangle,
-  FileText,
   Activity,
-  Globe,
   Stethoscope,
   Brain,
   Wind,
   Baby,
   Sparkles,
-  Flame,
   Search,
-  CheckCircle2,
   Ribbon,
   ShieldAlert,
   BedDouble,
@@ -199,7 +193,7 @@ const STEPS = [
 
 export const OnboardingPage: React.FC = () => {
   const navigate = useNavigate();
-  const { plan } = usePlanStore();
+  const { setPatientProfile } = usePlanStore();
   const { user } = useAuthStore();
 
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -264,7 +258,7 @@ export const OnboardingPage: React.FC = () => {
       setCurrentStep((s) => s + 1);
     } else {
       // Step 5: Persist profile to usePlanStore, useAppPreferencesStore, backend usersApi & localStorage
-      usePlanStore.getState().setPatientProfile({
+      setPatientProfile({
         name: formData.patientName,
         pathway: formData.pathwayId,
         surgeryDate: formData.surgeryDate,

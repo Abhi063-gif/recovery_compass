@@ -1,25 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Users,
   AlertTriangle,
   CheckCircle2,
   Calendar,
   Pill,
-  Activity,
-  Phone,
   MessageSquare,
   Shield,
   Search,
-  Filter,
-  Plus,
-  Send,
-  Eye,
   FileCheck,
   HeartPulse,
-  Clock,
-  Sparkles,
 } from 'lucide-react';
-import { speakText } from '@/services/i18n';
 import { communityApi, CaseloadPatient, LogAshaVisitDto, EscalateRiskDto } from '@/api/community';
 import { offlineStorage } from '@/services/offlineSync';
 
@@ -245,9 +235,7 @@ export const AshaDashboardPage: React.FC = () => {
     }, 2500);
   };
 
-  const handleSendEscalation = handleEscalate;
-
-  return (
+return (
     <div className="space-y-6 max-w-5xl mx-auto py-2">
       {/* Top Header Card */}
       <div className="bg-gradient-to-r from-teal-900 via-emerald-900 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-card flex flex-col md:flex-row md:items-center justify-between gap-4">

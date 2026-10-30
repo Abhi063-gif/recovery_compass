@@ -14,3 +14,4 @@ export * from './privacy';
 export * from './admin';
 export * from './preferences';
 export * from './questions';
+export * from './community';

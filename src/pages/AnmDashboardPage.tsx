@@ -1,19 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
   ShieldAlert,
-  AlertTriangle,
-  CheckCircle2,
   Phone,
-  MessageSquare,
   Building2,
-  Clock,
   UserCheck,
-  Send,
-  ExternalLink,
   ChevronRight,
-  Filter,
 } from 'lucide-react';
-import { communityApi, Escalation } from '@/api/community';
+import { communityApi } from '@/api/community';
 
 interface EscalationRecord {
   id: string;
@@ -140,8 +133,6 @@ export const AnmDashboardPage: React.FC = () => {
     setActiveReviewEscalation(null);
     setActionNotes('');
   };
-
-  const handleApplyResolution = handleResolveEscalation;
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto py-2">
