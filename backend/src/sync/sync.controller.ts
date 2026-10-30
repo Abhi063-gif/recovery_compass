@@ -3,7 +3,10 @@ import { SyncService } from './sync.service';
 import { SyncPushDto, SyncPullQueryDto } from './sync.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
-@Controller('sync')
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
+
+@ApiTags('Sync')
+@Controller({ path: 'sync', version: '1' })
 export class SyncController {
   constructor(private readonly syncService: SyncService) {}
 

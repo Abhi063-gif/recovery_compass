@@ -130,10 +130,20 @@ class OfflineStorageEngine {
       return { success: true, syncedCount: 0 };
     }
 
+    const metaEnv = (import.meta as { env?: Record<string, string> }).env;
+    const baseUrl = (metaEnv?.VITE_API_BASE_URL || 'http://localhost:3000/api/v1').replace(/\/$/, '');
+    const token = localStorage.getItem('recovery_compass_access_token');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     try {
-      const response = await fetch('/api/sync/push', {
+      const response = await fetch(`${baseUrl}/sync/push`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           mutations,
           deviceId: 'web-pwa-client',

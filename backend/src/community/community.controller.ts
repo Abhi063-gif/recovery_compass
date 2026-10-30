@@ -2,7 +2,10 @@ import { Controller, Get, Post, Put, Body, Param, Query, Req, UseGuards } from '
 import { CommunityService } from './community.service';
 import { LogAshaVisitDto, EscalateRiskDto, ResolveEscalationDto } from './community.dto';
 
-@Controller('community')
+import { ApiTags } from '@nestjs/swagger';
+
+@ApiTags('Community')
+@Controller({ path: 'community', version: '1' })
 export class CommunityController {
   constructor(private readonly communityService: CommunityService) {}
 
