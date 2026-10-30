@@ -22,10 +22,12 @@ import {
   CheckCircle2,
   Ribbon,
   ShieldAlert,
-  BedDouble
+  BedDouble,
 } from 'lucide-react';
 import { usePlanStore } from '@/stores/usePlanStore';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { useAppPreferencesStore } from '@/stores/useAppPreferencesStore';
+import { usersApi } from '@/api/preferences';
 
 export interface RecoveryPathwayOption {
   id: string;
@@ -43,12 +45,12 @@ export interface RecoveryPathwayOption {
 
 export const RECOVERY_PATHWAYS: RecoveryPathwayOption[] = [
   {
-    id: 'post-surgery-general',
+    id: 'POST_SURGERY',
     category: 'surgical',
     categoryLabel: 'Surgical',
-    title: 'General & Abdominal Surgery',
-    badge: 'Most Common',
-    description: 'Laparoscopy, Cholecystectomy, Appendectomy, Hernia Repair, Bowel Resection',
+    title: 'Post-Surgery Recovery',
+    badge: 'PRD v3.0 Core',
+    description: 'General & Abdominal Surgery, Laparoscopy, Cholecystectomy, Appendectomy, Hernia Repair',
     examples: 'Incision site care, lifting restrictions, early walking, pain titration, bland diet',
     icon: Activity,
     color: 'bg-rose-700 text-white',
@@ -56,7 +58,59 @@ export const RECOVERY_PATHWAYS: RecoveryPathwayOption[] = [
     date2Label: 'Date of Discharge',
   },
   {
-    id: 'orthopedic-joint',
+    id: 'PREGNANCY',
+    category: 'specialty',
+    categoryLabel: 'Maternal',
+    title: 'Pregnancy & Maternal Recovery',
+    badge: 'PRD v3.0 Core',
+    description: 'Cesarean Section, High-Risk Delivery Recovery, Pelvic Floor Healing, Postpartum Care',
+    examples: 'Surgical incision healing, lochia tracking, postpartum preeclampsia warning signs, infant feeding rest',
+    icon: Baby,
+    color: 'bg-pink-700 text-white',
+    date1Label: 'Date of Delivery / C-Section',
+    date2Label: 'Date of Discharge Home',
+  },
+  {
+    id: 'DIABETES',
+    category: 'specialty',
+    categoryLabel: 'Chronic Care',
+    title: 'Diabetes Management',
+    badge: 'PRD v3.0 Core',
+    description: 'Type 1/2 Diabetes, Diabetic Foot Ulcers, Glycemic Stabilization, Wound Healing',
+    examples: 'Daily blood sugar logs (fasting & post-prandial), wound dressing changes, dietary carbs, foot inspection',
+    icon: ShieldAlert,
+    color: 'bg-teal-700 text-white',
+    date1Label: 'Date of Clinical Assessment / Procedure',
+    date2Label: 'Date of Discharge / Protocol Start',
+  },
+  {
+    id: 'TUBERCULOSIS',
+    category: 'specialty',
+    categoryLabel: 'National Health Mission',
+    title: 'Tuberculosis DOTS',
+    badge: 'PRD v3.0 Core',
+    description: 'Directly Observed Therapy (DOTS), Sputum Check Milestones, Nikshay Poshan Scheme',
+    examples: 'Daily antibiotic adherence logging, anti-emetic timing, monthly sputum tests, Nikshay Rs 500 DBT verification',
+    icon: Wind,
+    color: 'bg-amber-600 text-white',
+    date1Label: 'Date of Diagnosis / Treatment Start',
+    date2Label: 'Date of Discharge / DOTS Enrolment',
+  },
+  {
+    id: 'HYPERTENSION',
+    category: 'cardiac',
+    categoryLabel: 'Chronic Care',
+    title: 'Hypertension Care',
+    badge: 'PRD v3.0 Core',
+    description: 'Essential Hypertension, Post-Hypertensive Emergency Step-Down, Antihypertensive Titration',
+    examples: 'Twice daily blood pressure logging, low-sodium dietary adherence, warning signs (severe headache, vision blur)',
+    icon: Heart,
+    color: 'bg-rose-600 text-white',
+    date1Label: 'Date of Clinical Assessment',
+    date2Label: 'Date of Discharge / Regimen Start',
+  },
+  {
+    id: 'ORTHOPEDIC_RECOVERY',
     category: 'orthopedic',
     categoryLabel: 'Orthopedic',
     title: 'Orthopedic & Joint Replacement',
@@ -69,7 +123,7 @@ export const RECOVERY_PATHWAYS: RecoveryPathwayOption[] = [
     date2Label: 'Date of Discharge',
   },
   {
-    id: 'cardiac-rehab',
+    id: 'CARDIAC_REHAB',
     category: 'cardiac',
     categoryLabel: 'Cardiac',
     title: 'Cardiac Rehabilitation & Post-MI',
@@ -108,19 +162,6 @@ export const RECOVERY_PATHWAYS: RecoveryPathwayOption[] = [
     date2Label: 'Date of Discharge',
   },
   {
-    id: 'postpartum-csection',
-    category: 'specialty',
-    categoryLabel: 'Maternal',
-    title: 'Postpartum & C-Section Healing',
-    badge: 'Maternal Care',
-    description: 'Cesarean Section, High-Risk Delivery Recovery, Pelvic Floor Healing, Postpartum Care',
-    examples: 'Surgical incision healing, lochia tracking, postpartum preeclampsia warning signs, infant feeding rest',
-    icon: Baby,
-    color: 'bg-pink-700 text-white',
-    date1Label: 'Date of Delivery / C-Section',
-    date2Label: 'Date of Discharge Home',
-  },
-  {
     id: 'oncology-chemo',
     category: 'specialty',
     categoryLabel: 'Specialty',
@@ -131,19 +172,6 @@ export const RECOVERY_PATHWAYS: RecoveryPathwayOption[] = [
     icon: Ribbon,
     color: 'bg-amber-700 text-white',
     date1Label: 'Date of Procedure / Infusion Cycle',
-    date2Label: 'Date of Discharge',
-  },
-  {
-    id: 'diabetic-wound',
-    category: 'specialty',
-    categoryLabel: 'Specialty',
-    title: 'Diabetic & Chronic Wound Recovery',
-    badge: 'Wound Care',
-    description: 'Diabetic Foot Ulcers, Vascular Stent Recovery, Graft Care, Stoma & Ostomy Management',
-    examples: 'Daily dressing change protocols, offloading compliance, blood glucose limits, tissue perfusion check',
-    icon: ShieldAlert,
-    color: 'bg-teal-700 text-white',
-    date1Label: 'Date of Procedure / Debridement',
     date2Label: 'Date of Discharge',
   },
   {
@@ -158,32 +186,6 @@ export const RECOVERY_PATHWAYS: RecoveryPathwayOption[] = [
     color: 'bg-slate-800 text-white',
     date1Label: 'Date of ICU Discharge',
     date2Label: 'Date of Home Discharge',
-  },
-  {
-    id: 'tuberculosis-dots',
-    category: 'specialty',
-    categoryLabel: 'National Health Mission',
-    title: 'Tuberculosis (DOTS) Recovery',
-    badge: 'SIH PRD Pathway',
-    description: 'Directly Observed Therapy (DOTS), Sputum Check Milestones, Nikshay Nutrition Scheme',
-    examples: 'Daily antibiotic adherence logging, anti-emetic timing, monthly sputum tests, Nikshay Rs 500 DBT verification',
-    icon: Wind,
-    color: 'bg-amber-600 text-white',
-    date1Label: 'Date of Diagnosis / Treatment Start',
-    date2Label: 'Date of Discharge / DOTS Enrolment',
-  },
-  {
-    id: 'hypertension-care',
-    category: 'cardiac',
-    categoryLabel: 'Chronic Care',
-    title: 'Hypertension & Cardiovascular Health',
-    badge: 'SIH PRD Pathway',
-    description: 'Essential Hypertension, Post-Hypertensive Emergency Step-Down, Antihypertensive Titration',
-    examples: 'Twice daily blood pressure logging, low-sodium dietary adherence, warning signs (severe headache, vision blur)',
-    icon: Heart,
-    color: 'bg-rose-600 text-white',
-    date1Label: 'Date of Clinical Assessment',
-    date2Label: 'Date of Discharge / Regimen Start',
   },
 ];
 
@@ -204,17 +206,27 @@ export const OnboardingPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
-  const defaultPatientName = user
+  // Check saved profile in localStorage
+  const savedProfile = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('rc_onboarding_profile');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const defaultPatientName = savedProfile?.patientName || (user
     ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email?.split('@')[0] || ''
-    : '';
+    : '');
 
   const [formData, setFormData] = useState({
     patientName: defaultPatientName,
-    pathwayId: 'post-surgery-general',
-    surgeryDate: new Date().toISOString().split('T')[0],
-    dischargeDate: new Date().toISOString().split('T')[0],
-    isCaregiver: false,
-    language: 'en',
+    pathwayId: savedProfile?.pathwayId || 'POST_SURGERY',
+    surgeryDate: savedProfile?.surgeryDate || new Date().toISOString().split('T')[0],
+    dischargeDate: savedProfile?.dischargeDate || new Date().toISOString().split('T')[0],
+    isCaregiver: savedProfile?.isCaregiver ?? false,
+    language: savedProfile?.language || 'en',
   });
 
   const [dateError, setDateError] = useState<string | null>(null);
@@ -246,11 +258,40 @@ export const OnboardingPage: React.FC = () => {
     return true;
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (currentStep === 2 && !validateDates()) return;
     if (currentStep < 5) {
       setCurrentStep((s) => s + 1);
     } else {
+      // Step 5: Persist profile to usePlanStore, useAppPreferencesStore, backend usersApi & localStorage
+      usePlanStore.getState().setPatientProfile({
+        name: formData.patientName,
+        pathway: formData.pathwayId,
+        surgeryDate: formData.surgeryDate,
+        dischargeDate: formData.dischargeDate,
+        language: formData.language,
+      });
+
+      useAppPreferencesStore.getState().setLanguage(formData.language);
+
+      try {
+        if (user) {
+          await usersApi.updateProfile({
+            firstName: formData.patientName,
+            pathway: formData.pathwayId,
+            language: formData.language,
+          });
+        }
+      } catch (err) {
+        console.warn('Backend update profile skipped or offline:', err);
+      }
+
+      try {
+        localStorage.setItem('rc_onboarding_profile', JSON.stringify(formData));
+      } catch (e) {
+        // LocalStorage quota or disabled
+      }
+
       navigate('/documents/upload');
     }
   };
@@ -322,7 +363,7 @@ export const OnboardingPage: React.FC = () => {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by procedure (e.g. Knee replacement, Heart bypass, Stroke, C-Section, Pneumonia)..."
+                  placeholder="Search by procedure (e.g. Surgery, Pregnancy, Diabetes, TB, Hypertension, Knee)..."
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-600 text-slate-900"
                 />
               </div>
@@ -448,6 +489,7 @@ export const OnboardingPage: React.FC = () => {
                   type="text"
                   value={formData.patientName}
                   onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
+                  placeholder="e.g. Ramesh Kumar"
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium focus:bg-white text-slate-900"
                 />
               </div>
@@ -494,18 +536,18 @@ export const OnboardingPage: React.FC = () => {
             <div className="text-center max-w-md mx-auto">
               <h1 className="text-2xl font-bold text-slate-900">Preferred Language</h1>
               <p className="text-xs text-slate-500 mt-1">
-                Choose your primary language for daily tasks, instructions, and red-flag alerts.
+                Choose your primary language for daily tasks, audio guidance, and red-flag alerts.
               </p>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {[
-                { code: 'en', label: 'English (US)' },
-                { code: 'es', label: 'Español (Spanish)' },
-                { code: 'fr', label: 'Français (French)' },
-                { code: 'hi', label: 'हिन्दी (Hindi)' },
-                { code: 'zh', label: '中文 (Chinese)' },
-                { code: 'ar', label: 'العربية (Arabic)' },
+                { code: 'en', label: 'English', sub: 'English' },
+                { code: 'hi', label: 'हिन्दी', sub: 'Hindi' },
+                { code: 'mr', label: 'मराठी', sub: 'Marathi' },
+                { code: 'pa', label: 'ਪੰਜਾਬੀ', sub: 'Punjabi (Tier 2)' },
+                { code: 'bn', label: 'বাংলা', sub: 'Bengali (Tier 2)' },
+                { code: 'ta', label: 'தமிழ்', sub: 'Tamil (Tier 2)' },
               ].map((lang) => (
                 <button
                   key={lang.code}
@@ -517,7 +559,8 @@ export const OnboardingPage: React.FC = () => {
                       : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
                   }`}
                 >
-                  {lang.label}
+                  <span className="block text-sm">{lang.label}</span>
+                  <span className="text-[10px] text-slate-500 font-normal">{lang.sub}</span>
                 </button>
               ))}
             </div>
@@ -579,7 +622,7 @@ export const OnboardingPage: React.FC = () => {
             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-3 text-xs">
               <div className="flex justify-between py-1 border-b border-slate-200">
                 <span className="text-slate-500">Patient Name:</span>
-                <span className="font-bold text-slate-900">{formData.patientName}</span>
+                <span className="font-bold text-slate-900">{formData.patientName || 'Not specified'}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-200">
                 <span className="text-slate-500">Care Pathway:</span>
@@ -592,6 +635,10 @@ export const OnboardingPage: React.FC = () => {
               <div className="flex justify-between py-1 border-b border-slate-200">
                 <span className="text-slate-500">{selectedPathway.date2Label}:</span>
                 <span className="font-bold text-slate-900">{formData.dischargeDate}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-200">
+                <span className="text-slate-500">Language:</span>
+                <span className="font-bold text-slate-900 uppercase">{formData.language}</span>
               </div>
               <div className="flex justify-between py-1">
                 <span className="text-slate-500">Caregiver Assistance:</span>

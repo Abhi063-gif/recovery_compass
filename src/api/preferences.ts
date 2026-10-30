@@ -29,3 +29,5 @@ export const preferencesApi = {
     return apiClient.patch(ENDPOINTS.USERS.PROFILE, profile);
   },
 };
+
+export const usersApi = preferencesApi;

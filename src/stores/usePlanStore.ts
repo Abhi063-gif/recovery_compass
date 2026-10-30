@@ -92,6 +92,7 @@ interface PlanState {
   // Demo Reset
   loadDemoPatient: () => void;
   resetAll: () => void;
+  setPatientProfile: (profile: Partial<UserProfile>) => void;
 }
 
 export const usePlanStore = create<PlanState>((set, get) => ({
@@ -113,6 +114,18 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   syncError: null,
 
   setUploadedFile: (file) => set({ uploadedFile: file }),
+  setPatientProfile: (profile) => {
+    set((state) => ({
+      plan: {
+        ...state.plan,
+        patientProfile: {
+          ...state.plan.patientProfile,
+          ...profile,
+        },
+      },
+    }));
+    get().saveOfflineSnapshot();
+  },
 
   startDocProcessing: async (onComplete) => {
     set({ isProcessingDoc: true, processingStage: 1, processingStageLabel: 'Quality check & resolution analysis' });
