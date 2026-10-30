@@ -123,6 +123,39 @@ class OfflineStorageEngine {
     }
   }
 
+  // Save caseload locally for offline use
+  async saveCaseload(caseload: any[]): Promise<void> {
+    try {
+      const db = await this.getDb();
+      const tx = db.transaction('caseload', 'readwrite');
+      const store = tx.objectStore('caseload');
+      for (const item of caseload) {
+        store.put(item);
+      }
+    } catch {
+      localStorage.setItem('rc_offline_caseload', JSON.stringify(caseload));
+    }
+  }
+
+  // Retrieve caseload locally when offline
+  async getCaseload(): Promise<any[]> {
+    try {
+      const db = await this.getDb();
+      return new Promise((resolve) => {
+        const tx = db.transaction('caseload', 'readonly');
+        const req = tx.objectStore('caseload').getAll();
+        req.onsuccess = () => {
+          const res = req.result || [];
+          if (res.length > 0) resolve(res);
+          else resolve(JSON.parse(localStorage.getItem('rc_offline_caseload') || '[]'));
+        };
+        req.onerror = () => resolve(JSON.parse(localStorage.getItem('rc_offline_caseload') || '[]'));
+      });
+    } catch {
+      return JSON.parse(localStorage.getItem('rc_offline_caseload') || '[]');
+    }
+  }
+
   // Push pending outbox to backend API
   async syncOutbox(): Promise<{ success: boolean; syncedCount: number }> {
     const mutations = await this.getOutbox();

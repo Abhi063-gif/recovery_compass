@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShieldAlert,
   AlertTriangle,
@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Filter,
 } from 'lucide-react';
+import { communityApi, Escalation } from '@/api/community';
 
 interface EscalationRecord {
   id: string;
@@ -79,13 +80,51 @@ export const AnmDashboardPage: React.FC = () => {
   const [actionNotes, setActionNotes] = useState<string>('');
   const [selectedFacility, setSelectedFacility] = useState<string>('Primary Health Centre (PHC) Koregaon Bhima');
 
+  useEffect(() => {
+    communityApi
+      .getEscalations('ANM')
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          const mapped: EscalationRecord[] = data.map((d: any) => ({
+            id: d.id,
+            patientId: d.patientId,
+            patientName: d.patientName || d.patientId,
+            village: d.village || 'Shirur Taluka',
+            ashaWorker: d.raisedBy || 'ASHA Worker',
+            pathway: d.pathway || 'POST_SURGERY',
+            severity: d.severity || 'URGENT',
+            reason: d.reason,
+            status: d.status || 'RAISED',
+            createdAt: d.createdAt ? new Date(d.createdAt).toLocaleDateString() : 'Recent',
+            resolutionNotes: d.resolutionNotes || d.notes,
+            referralFacility: d.referralFacility,
+          }));
+          setEscalations(mapped);
+        }
+      })
+      .catch((err) => {
+        console.warn('Failed to fetch escalations from backend, keeping cached state:', err);
+      });
+  }, []);
+
   const filteredEscalations = escalations.filter((e) => {
     if (selectedStatus === 'ALL') return true;
     return e.status === selectedStatus;
   });
 
-  const handleApplyResolution = () => {
+  const handleResolveEscalation = async () => {
     if (!activeReviewEscalation) return;
+
+    try {
+      await communityApi.resolveEscalation(activeReviewEscalation.id, {
+        status: resolutionAction,
+        resolutionNotes: actionNotes,
+        referralFacility: resolutionAction === 'REFERRED' ? selectedFacility : undefined,
+      });
+    } catch (err) {
+      console.warn('Could not update escalation on backend (offline):', err);
+    }
+
     setEscalations((prev) =>
       prev.map((e) =>
         e.id === activeReviewEscalation.id
@@ -101,6 +140,8 @@ export const AnmDashboardPage: React.FC = () => {
     setActiveReviewEscalation(null);
     setActionNotes('');
   };
+
+  const handleApplyResolution = handleResolveEscalation;
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto py-2">
@@ -218,37 +259,70 @@ export const AnmDashboardPage: React.FC = () => {
 
               {/* Resolution Info if actioned */}
               {item.resolutionNotes && (
-                <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-xs text-emerald-950 space-y-1">
-                  <span className="text-[10px] uppercase font-bold text-emerald-700 flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                    ANM Action & Resolution:
+                <div className="p-3 bg-purple-50/70 rounded-2xl border border-purple-100 text-xs space-y-1">
+                  <span className="text-[10px] font-bold text-purple-900 uppercase block">
+                    ANM Supervisory Decision:
                   </span>
-                  <p>{item.resolutionNotes}</p>
+                  <p className="text-slate-700 italic">"{item.resolutionNotes}"</p>
                   {item.referralFacility && (
-                    <p className="text-emerald-800 font-bold">
-                      Referred to: {item.referralFacility}
-                    </p>
+                    <div className="flex items-center gap-1 text-[11px] font-semibold text-purple-950 pt-1">
+                      <Building2 className="w-3.5 h-3.5 text-purple-700" />
+                      <span>Referred to: {item.referralFacility}</span>
+                    </div>
                   )}
                 </div>
               )}
+
+              {/* Action Ribbon */}
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs text-slate-500">
+                <div className="flex items-center gap-3">
+                  <a
+                    href="tel:108"
+                    className="flex items-center gap-1 text-rose-700 hover:underline font-bold"
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                    <span>Call 108 Ambulance</span>
+                  </a>
+                  <a
+                    href="tel:104"
+                    className="flex items-center gap-1 text-sky-700 hover:underline font-bold"
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                    <span>Call 104 Helpline</span>
+                  </a>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setActiveReviewEscalation(item);
+                    setActionNotes(item.resolutionNotes || '');
+                  }}
+                  className="text-purple-900 hover:underline font-bold flex items-center gap-1"
+                >
+                  <span>Take Supervisory Action</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           );
         })}
       </div>
 
-      {/* MODAL: Review & Action */}
+      {/* Review & Action Modal */}
       {activeReviewEscalation && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-5">
             <div className="flex items-start justify-between pb-3 border-b border-slate-100">
               <div>
-                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 uppercase">
-                  Action Escalation (PRD C5)
+                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-900 uppercase">
+                  Supervisory Clinical Decision
                 </span>
                 <h3 className="text-xl font-bold text-slate-900 mt-1">
-                  {activeReviewEscalation.patientName}
+                  Action Escalation: {activeReviewEscalation.patientName}
                 </h3>
-                <p className="text-xs text-slate-500">{activeReviewEscalation.village}</p>
+                <p className="text-xs text-slate-500">
+                  {activeReviewEscalation.village} • Raised by {activeReviewEscalation.ashaWorker}
+                </p>
               </div>
               <button
                 onClick={() => setActiveReviewEscalation(null)}
@@ -259,40 +333,61 @@ export const AnmDashboardPage: React.FC = () => {
             </div>
 
             <div className="space-y-4 text-xs">
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl">
+                <span className="text-[10px] uppercase font-bold text-rose-800 block mb-0.5">
+                  Clinical Trigger:
+                </span>
+                <p className="text-rose-950 font-medium">{activeReviewEscalation.reason}</p>
+              </div>
+
               <div>
                 <label className="text-[10px] font-bold uppercase text-slate-500 block mb-1">
-                  Select Action / Status:
+                  Select Action / Disposition:
                 </label>
-                <select
-                  value={resolutionAction}
-                  onChange={(e) => setResolutionAction(e.target.value as any)}
-                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-purple-900"
-                >
-                  <option value="REFERRED">Refer to Hospital / PHC</option>
-                  <option value="ACKNOWLEDGED">Acknowledge & Instruct ASHA</option>
-                  <option value="VISITED">ANM Home Visit Scheduled</option>
-                  <option value="RESOLVED">Mark Resolved (Condition Stabilized)</option>
-                </select>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'ACKNOWLEDGED' as const, label: 'Tele-Consult Patient' },
+                    { id: 'VISITED' as const, label: 'Schedule In-Person Visit' },
+                    { id: 'REFERRED' as const, label: 'Refer to PHC / Hospital' },
+                    { id: 'RESOLVED' as const, label: 'Issue Resolved & Safe' },
+                  ].map((act) => (
+                    <button
+                      key={act.id}
+                      type="button"
+                      onClick={() => setResolutionAction(act.id)}
+                      className={`p-2.5 rounded-xl border text-xs font-bold text-left transition ${
+                        resolutionAction === act.id
+                          ? 'border-purple-600 bg-purple-50 text-purple-950 ring-2 ring-purple-100'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                      }`}
+                    >
+                      {act.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {resolutionAction === 'REFERRED' && (
                 <div>
                   <label className="text-[10px] font-bold uppercase text-slate-500 block mb-1">
-                    Referral Hospital / Facility:
+                    Select Referral Facility:
                   </label>
                   <select
                     value={selectedFacility}
                     onChange={(e) => setSelectedFacility(e.target.value)}
-                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800"
+                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium"
                   >
                     <option value="Primary Health Centre (PHC) Koregaon Bhima">
-                      PHC Koregaon Bhima (OPD / Emergency)
+                      Primary Health Centre (PHC) Koregaon Bhima
                     </option>
-                    <option value="Rural Hospital (RH) Shirur">
-                      Rural Hospital Shirur (Specialist / Inpatient)
+                    <option value="Rural Hospital Shirur (Sub-District)">
+                      Rural Hospital Shirur (Sub-District)
                     </option>
-                    <option value="District Hospital Aundh">
-                      District Hospital Aundh (Tertiary ICU / Surgery)
+                    <option value="District Hospital Aundh, Pune">
+                      District Hospital Aundh, Pune
+                    </option>
+                    <option value="Sassoon General Hospital, Pune (Tertiary)">
+                      Sassoon General Hospital, Pune (Tertiary)
                     </option>
                   </select>
                 </div>
@@ -319,7 +414,7 @@ export const AnmDashboardPage: React.FC = () => {
                   Cancel
                 </button>
                 <button
-                  onClick={handleApplyResolution}
+                  onClick={handleResolveEscalation}
                   className="px-5 py-2 bg-purple-900 hover:bg-purple-800 text-white rounded-xl font-bold shadow-sm"
                 >
                   Confirm & Save Action

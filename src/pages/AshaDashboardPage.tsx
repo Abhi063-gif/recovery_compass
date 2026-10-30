@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Users,
   AlertTriangle,
@@ -20,26 +20,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { speakText } from '@/services/i18n';
-
-interface CaseloadPatient {
-  patientId: string;
-  name: string;
-  age: number;
-  gender: string;
-  village: string;
-  pathway: string;
-  dischargeDate: string;
-  currentDay: number;
-  riskTier: 'GREEN' | 'AMBER' | 'RED';
-  riskScore: number;
-  riskFactors: string[];
-  lastVisitDate?: string;
-  nextScheduledVisit: string;
-  medicationAdherenceRate: number;
-  missedDosesCount: number;
-  recentRedFlagsCount: number;
-  isAshaVerified?: boolean;
-}
+import { communityApi, CaseloadPatient, LogAshaVisitDto, EscalateRiskDto } from '@/api/community';
+import { offlineStorage } from '@/services/offlineSync';
 
 const INITIAL_CASELOAD: CaseloadPatient[] = [
   {
@@ -143,6 +125,24 @@ export const AshaDashboardPage: React.FC = () => {
   const [escalateTargetRole, setEscalateTargetRole] = useState<'ANM' | 'PHC_MEDICAL_OFFICER'>('ANM');
   const [escalationSuccessMsg, setEscalationSuccessMsg] = useState<string | null>(null);
 
+  useEffect(() => {
+    communityApi
+      .getCaseload()
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setCaseload(data);
+          offlineStorage.saveCaseload(data).catch(() => {});
+        }
+      })
+      .catch(async (err) => {
+        console.warn('Backend caseload unavailable, loading from offlineStorage:', err);
+        const cached = await offlineStorage.getCaseload();
+        if (Array.isArray(cached) && cached.length > 0) {
+          setCaseload(cached);
+        }
+      });
+  }, []);
+
   const filteredCaseload = caseload.filter((p) => {
     if (selectedRiskFilter !== 'ALL' && p.riskTier !== selectedRiskFilter) return false;
     if (searchQuery.trim() === '') return true;
@@ -153,33 +153,99 @@ export const AshaDashboardPage: React.FC = () => {
     );
   });
 
-  const handleSaveVisit = (patientId: string) => {
-    setCaseload((prev) =>
-      prev.map((p) =>
+  const handleSaveVisit = async (patientId: string) => {
+    const bpParts = vitalsBp.split('/');
+    const visitDto: LogAshaVisitDto = {
+      patientId,
+      visitDate: new Date().toISOString(),
+      medicationVerified: medsPresentInBlister && takenAsPerPlan,
+      medicationNotes: `Blister check: ${medsPresentInBlister ? 'Yes' : 'No'}, Taken per plan: ${takenAsPerPlan ? 'Yes' : 'No'}`,
+      remainingPillCount: remainingPillsCount,
+      sideEffectsReported: reportedSideEffects && reportedSideEffects !== 'None' ? [reportedSideEffects] : [],
+      vitals: {
+        bloodPressureSystolic: bpParts[0] ? parseInt(bpParts[0], 10) : undefined,
+        bloodPressureDiastolic: bpParts[1] ? parseInt(bpParts[1], 10) : undefined,
+        bloodGlucoseMgDl: vitalsSugar ? parseFloat(vitalsSugar) : undefined,
+        temperatureFahrenheit: vitalsTemp ? parseFloat(vitalsTemp) : undefined,
+      },
+      notes: visitNotes,
+    };
+
+    try {
+      await communityApi.logVisit(visitDto);
+    } catch (err) {
+      console.warn('Offline logging ASHA visit, queueing mutation:', err);
+      await offlineStorage.queueMutation({
+        id: `visit-${Date.now()}`,
+        entity: 'asha_visit',
+        action: 'CREATE',
+        payload: visitDto,
+        clientTimestamp: new Date().toISOString(),
+      });
+    }
+
+    setCaseload((prev) => {
+      const updated = prev.map((p) =>
         p.patientId === patientId
           ? {
               ...p,
               isAshaVerified: true,
               lastVisitDate: new Date().toISOString().split('T')[0],
-              riskTier: p.riskTier === 'RED' && takenAsPerPlan ? 'AMBER' : p.riskTier,
+              riskTier: p.riskTier === 'RED' && takenAsPerPlan ? ('AMBER' as const) : p.riskTier,
             }
           : p
-      )
-    );
+      );
+      offlineStorage.saveCaseload(updated).catch(() => {});
+      return updated;
+    });
+
     setActiveVisitPatient(null);
   };
 
-  const handleSendEscalation = () => {
+  const handleEscalate = async () => {
     if (!activeEscalatePatient) return;
-    setEscalationSuccessMsg(
-      `Escalation lodged with ${escalateTargetRole}. An offline SMS link has also been generated.`
-    );
+
+    const escalateDto: EscalateRiskDto = {
+      patientId: activeEscalatePatient.patientId,
+      targetRole: escalateTargetRole,
+      severity: escalateSeverity,
+      reason: escalateReason || 'Clinical risk review requested by ASHA worker',
+      triggerDetails: activeEscalatePatient.riskFactors.join(', '),
+      currentVitalsSummary: `BP: ${vitalsBp}, Temp: ${vitalsTemp}°F`,
+      notes: `Escalated by ASHA for patient ${activeEscalatePatient.name} in ${activeEscalatePatient.village}`,
+    };
+
+    let isOffline = false;
+    try {
+      await communityApi.escalate(escalateDto);
+      setEscalationSuccessMsg(
+        `Escalation lodged with ${escalateTargetRole}. An offline SMS link has also been generated.`
+      );
+    } catch (err) {
+      console.warn('Offline queuing escalation:', err);
+      isOffline = true;
+      await offlineStorage.queueMutation({
+        id: `esc-${Date.now()}`,
+        entity: 'escalation',
+        action: 'CREATE',
+        payload: escalateDto,
+        clientTimestamp: new Date().toISOString(),
+      });
+      setEscalationSuccessMsg(
+        `Offline: Escalation saved to device outbox. Please use the cellular SMS link below to alert the ${escalateTargetRole} directly.`
+      );
+    }
+
     setTimeout(() => {
-      setEscalationSuccessMsg(null);
-      setActiveEscalatePatient(null);
-      setEscalateReason('');
+      if (!isOffline) {
+        setEscalationSuccessMsg(null);
+        setActiveEscalatePatient(null);
+        setEscalateReason('');
+      }
     }, 2500);
   };
+
+  const handleSendEscalation = handleEscalate;
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto py-2">
@@ -561,9 +627,21 @@ export const AshaDashboardPage: React.FC = () => {
             </div>
 
             {escalationSuccessMsg ? (
-              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 text-center space-y-2">
+              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 text-center space-y-3">
                 <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
                 <p className="text-xs font-bold text-emerald-900">{escalationSuccessMsg}</p>
+                {/* Always make prefilled SMS button available */}
+                <div className="pt-2">
+                  <a
+                    href={`sms:?body=${encodeURIComponent(
+                      `[RECOVERY COMPASS ESCALATION] Patient: ${activeEscalatePatient.name} (${activeEscalatePatient.village}). Severity: ${escalateSeverity}. Reason: ${escalateReason || 'Urgent clinical review requested'}.`
+                    )}`}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold shadow-sm"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span>Send Cellular SMS to ANM</span>
+                  </a>
+                </div>
               </div>
             ) : (
               <div className="space-y-4 text-xs">
@@ -639,7 +717,7 @@ export const AshaDashboardPage: React.FC = () => {
                     Cancel
                   </button>
                   <button
-                    onClick={handleSendEscalation}
+                    onClick={handleEscalate}
                     className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold shadow-sm"
                   >
                     Submit Escalation
