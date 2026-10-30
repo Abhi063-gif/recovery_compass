@@ -1,0 +1,977 @@
+// Recovery Compass — Prisma Schema
+// Complete normalized database schema for all entities
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // directUrl is used by `prisma migrate` — must be the direct connection (port 5432)
+  // not the transaction pooler. Leave unset if using localhost PostgreSQL.
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  PATIENT
+  CAREGIVER
+  ASHA
+  ANM
+  VHV
+  PHC_MEDICAL_OFFICER
+  ADMIN
+}
+
+enum DocumentStatus {
+  PENDING
+  QUALITY_ANALYSIS
+  QUALITY_FAILED
+  OCR_PROCESSING
+  OCR_DONE
+  EXTRACTING
+  EXTRACTION_DONE
+  NEEDS_REVIEW
+  CONFIRMED
+  ARCHIVED
+}
+
+enum QualityStatus {
+  ACCEPTABLE
+  NEEDS_RETAKE
+  UNREADABLE
+}
+
+enum ExtractionStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  NEEDS_REVIEW
+  CONFIRMED
+}
+
+enum ExtractionCategory {
+  MEDICINES
+  FOLLOW_UPS
+  TESTS
+  RESTRICTIONS
+  DIET
+  HYDRATION
+  TASKS
+  SYMPTOMS
+  RED_FLAGS
+  CONDITIONAL_INSTRUCTIONS
+}
+
+enum ConfidenceLevel {
+  HIGH
+  MEDIUM
+  LOW
+  UNCERTAIN
+}
+
+enum ValidationStatus {
+  VALID
+  NEEDS_REVIEW
+  CONFLICT
+  SUSPECTED_EXTRACTION_ERROR
+  CONFIRMED
+  UNCLEAR
+}
+
+enum PlanStatus {
+  DRAFT
+  AWAITING_CONFIRMATION
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum TaskStatus {
+  SCHEDULED
+  COMPLETED
+  SKIPPED
+  MISSED
+}
+
+enum ConditionalStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  EXPIRED
+}
+
+enum MedicationEventStatus {
+  SCHEDULED
+  TAKEN
+  SKIPPED
+  MISSED
+}
+
+enum RedFlagSeverity {
+  INFORMATIONAL
+  WARNING
+  URGENT
+  EMERGENCY
+}
+
+enum RedFlagAction {
+  MONITOR
+  CONTACT_CLINICIAN
+  SEEK_EMERGENCY_HELP
+}
+
+enum RedFlagRuleStatus {
+  DRAFT
+  REVIEW
+  ACTIVE
+  RETIRED
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  READ
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  PUSH
+  IN_APP
+}
+
+enum NotificationType {
+  MEDICATION_REMINDER
+  TASK_REMINDER
+  FOLLOW_UP_REMINDER
+  CAREGIVER_ALERT
+  SAFETY_ALERT
+  SYSTEM
+}
+
+enum CaregiverPermission {
+  VIEW_PLAN
+  RECEIVE_ALERTS
+  LOG_SYMPTOMS
+  MARK_MEDICATIONS
+}
+
+enum ConsentStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  REVOKED
+}
+
+enum JobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+  DEAD_LETTERED
+}
+
+enum DeletionRequestStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum PathwayIdentifier {
+  POST_SURGERY
+  PREGNANCY
+  DIABETES
+  TUBERCULOSIS
+  HYPERTENSION
+  CARDIAC_REHAB
+  ORTHOPEDIC_RECOVERY
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// USERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  phone             String?
+  passwordHash      String?
+  role              UserRole
+  firstName         String
+  lastName          String
+  isActive          Boolean   @default(true)
+  isEmailVerified   Boolean   @default(false)
+  isPhoneVerified   Boolean   @default(false)
+  lastLoginAt       DateTime?
+  deletedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  patientProfile    PatientProfile?
+  caregiverProfile  CaregiverProfile?
+  refreshTokens     RefreshToken[]
+  otpCodes          OtpCode[]
+  notifications     Notification[]
+  notificationPrefs NotificationPreference?
+  auditEvents       AuditEvent[]
+  sentInvitations   FamilyInvitation[]      @relation("InvitedBy")
+  deletionRequests  DeletionRequest[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model RefreshToken {
+  id         String   @id @default(uuid())
+  userId     String
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  isRevoked  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+}
+
+model OtpCode {
+  id         String   @id @default(uuid())
+  userId     String
+  code       String
+  purpose    String   // "EMAIL_VERIFY", "PHONE_VERIFY", "LOGIN", "INVITE"
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROFILES
+// ─────────────────────────────────────────────────────────────────────────────
+
+model PatientProfile {
+  id            String    @id @default(uuid())
+  userId        String    @unique
+  dateOfBirth   DateTime?
+  gender        String?
+  nhsNumber     String?   // or equivalent ID — nullable
+  emergencyContact String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recoveryPlans RecoveryPlan[]
+  familyInvitations FamilyInvitation[]
+  familyMemberships FamilyMembership[]  @relation("PatientMemberships")
+  consentRecords    ConsentRecord[]     @relation("PatientConsents")
+
+  @@index([userId])
+}
+
+model CaregiverProfile {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  relationship  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  familyMemberships FamilyMembership[] @relation("CaregiverMemberships")
+
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATHWAYS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model PathwayTemplate {
+  id                  String            @id @default(uuid())
+  identifier          PathwayIdentifier
+  name                String
+  description         String
+  version             Int               @default(1)
+  isActive            Boolean           @default(true)
+  supportedCategories ExtractionCategory[]
+  schedulingRules     Json              // JSON: day-range structures
+  metadata            Json?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  recoveryPlans       RecoveryPlan[]
+  redFlagRules        RedFlagRule[]
+
+  @@index([identifier, version])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DOCUMENTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model SourceDocument {
+  id               String         @id @default(uuid())
+  patientProfileId String
+  originalFileName String
+  storagePath      String         // encrypted object-storage key
+  mimeType         String
+  fileSizeBytes    Int
+  pageCount        Int?
+  status           DocumentStatus @default(PENDING)
+  qualityStatus    QualityStatus?
+  qualityIssues    String[]
+  qualityReport    Json?
+  uploadedAt       DateTime       @default(now())
+  deletedAt        DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  pages            DocumentPage[]
+  extractions      Extraction[]
+  processingJobs   ProcessingJob[]
+  auditEvents      AuditEvent[]
+
+  @@index([patientProfileId])
+  @@index([status])
+}
+
+model DocumentPage {
+  id             String    @id @default(uuid())
+  documentId     String
+  pageNumber     Int
+  rawText        String?
+  width          Float?    // points or pixels
+  height         Float?
+  storagePath    String?   // page image if needed
+  createdAt      DateTime  @default(now())
+
+  document       SourceDocument  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  regions        DocumentRegion[]
+
+  @@index([documentId, pageNumber])
+}
+
+model DocumentRegion {
+  id          String   @id @default(uuid())
+  pageId      String
+  x           Float
+  y           Float
+  width       Float
+  height      Float
+  text        String
+  confidence  Float?   // 0.0–1.0
+  createdAt   DateTime @default(now())
+
+  page        DocumentPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  extractionFields ExtractionField[]
+
+  @@index([pageId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXTRACTION
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Extraction {
+  id               String           @id @default(uuid())
+  documentId       String
+  status           ExtractionStatus @default(PENDING)
+  llmModel         String?
+  llmVersion       String?
+  rawLlmOutput     String?          // stored for audit, never shown to user as-is
+  schemaVersion    String           @default("1.0")
+  confirmedAt      DateTime?
+  confirmedBy      String?          // userId
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  document         SourceDocument   @relation(fields: [documentId], references: [id])
+  fields           ExtractionField[]
+  recoveryPlan     RecoveryPlan?
+
+  @@index([documentId])
+}
+
+model ExtractionField {
+  id               String             @id @default(uuid())
+  extractionId     String
+  category         ExtractionCategory
+  fieldKey         String             // e.g. "medicine.name", "followup.date"
+  value            String?
+  rawValue         String?            // preserves LLM output before normalization
+  sourceText       String?            // verbatim from document
+  page             Int?
+  boundingBox      Json?              // {x, y, w, h}
+  confidence       Float?             // 0.0–1.0
+  confidenceLevel  ConfidenceLevel?
+  validationStatus ValidationStatus   @default(NEEDS_REVIEW)
+  isUnclear        Boolean            @default(false)
+  conflictInfo     Json?
+  editedValue      String?            // value after user edit
+  editedAt         DateTime?
+  editedBy         String?            // userId
+  confirmedAt      DateTime?
+  confirmedBy      String?
+  notes            String?
+  deletedAt        DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  extraction       Extraction         @relation(fields: [extractionId], references: [id])
+  sourceRegion     DocumentRegion?    @relation(fields: [sourceRegionId], references: [id])
+  sourceRegionId   String?
+
+  @@index([extractionId, category])
+  @@index([validationStatus])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RECOVERY PLAN
+// ─────────────────────────────────────────────────────────────────────────────
+
+model RecoveryPlan {
+  id                String          @id @default(uuid())
+  patientProfileId  String
+  extractionId      String?         @unique
+  pathwayTemplateId String
+  planVersion       Int             @default(1)
+  status            PlanStatus      @default(DRAFT)
+  surgeryDate       DateTime?
+  dischargeDate     DateTime?
+  surgeryType       String?
+  clinicianName     String?
+  hospitalName      String?
+  confirmedAt       DateTime?
+  confirmedBy       String?         // userId
+  deletedAt         DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  patientProfile    PatientProfile  @relation(fields: [patientProfileId], references: [id])
+  extraction        Extraction?     @relation(fields: [extractionId], references: [id])
+  template          PathwayTemplate @relation(fields: [pathwayTemplateId], references: [id])
+  tasks             RecoveryTask[]
+  medications       Medication[]
+  followUps         FollowUp[]
+  symptomLogs       SymptomLog[]
+  redFlagEvents     RedFlagEvent[]
+  doctorQuestions   DoctorQuestion[]
+  planVersions      PlanVersion[]
+  auditEvents       AuditEvent[]
+
+  @@index([patientProfileId])
+  @@index([status])
+}
+
+model PlanVersion {
+  id           String       @id @default(uuid())
+  planId       String
+  version      Int
+  snapshot     Json         // full plan snapshot at this version
+  changedBy    String       // userId
+  changeReason String?
+  createdAt    DateTime     @default(now())
+
+  plan         RecoveryPlan @relation(fields: [planId], references: [id])
+
+  @@index([planId, version])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASKS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model RecoveryTask {
+  id                String            @id @default(uuid())
+  planId            String
+  title             String
+  description       String?
+  dayOffset         Int               // day from surgery/discharge
+  scheduledDate     DateTime?
+  status            TaskStatus        @default(SCHEDULED)
+  conditionalStatus ConditionalStatus?
+  condition         String?           // e.g. "CLINICIAN_APPROVAL_REQUIRED"
+  sourceDocumentId  String?
+  sourcePage        Int?
+  sourceBoundingBox Json?
+  sourceText        String?
+  extractionFieldId String?
+  isConditional     Boolean           @default(false)
+  deletedAt         DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  plan              RecoveryPlan      @relation(fields: [planId], references: [id])
+  events            TaskEvent[]
+
+  @@index([planId, dayOffset])
+  @@index([scheduledDate])
+}
+
+model TaskEvent {
+  id         String     @id @default(uuid())
+  taskId     String
+  status     TaskStatus
+  actedAt    DateTime   @default(now())
+  actorId    String     // userId
+  notes      String?
+
+  task       RecoveryTask @relation(fields: [taskId], references: [id])
+
+  @@index([taskId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MEDICATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Medication {
+  id                 String             @id @default(uuid())
+  planId             String
+  name               String
+  normalizedName     String?            // after RxNorm lookup
+  rxNormCode         String?
+  dose               String
+  doseUnit           String
+  frequency          String             // normalized text
+  frequencyCode      String?            // BD, TDS, HS, SOS
+  timing             String?
+  durationDays       Int?
+  startDate          DateTime?
+  endDate            DateTime?
+  isAsNeeded         Boolean            @default(false)
+  instructions       String?
+  sourceText         String?
+  sourcePage         Int?
+  sourceBoundingBox  Json?
+  extractionFieldId  String?
+  validationStatus   ValidationStatus   @default(NEEDS_REVIEW)
+  validationNotes    String?
+  fuzzyMatchScore    Float?
+  fuzzyMatchedTo     String?
+  conflictInfo       Json?
+  deletedAt          DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  plan               RecoveryPlan       @relation(fields: [planId], references: [id])
+  schedules          MedicationSchedule[]
+
+  @@index([planId])
+}
+
+model MedicationSchedule {
+  id            String               @id @default(uuid())
+  medicationId  String
+  scheduledAt   DateTime
+  timeLabel     String?              // "morning", "evening", "bedtime"
+  idempotencyKey String             @unique // prevent duplicate schedules
+  deletedAt     DateTime?
+  createdAt     DateTime             @default(now())
+
+  medication    Medication           @relation(fields: [medicationId], references: [id])
+  events        MedicationEvent[]
+  notifications Notification[]
+
+  @@index([medicationId])
+  @@index([scheduledAt])
+}
+
+model MedicationEvent {
+  id           String                @id @default(uuid())
+  scheduleId   String
+  status       MedicationEventStatus
+  actedAt      DateTime              @default(now())
+  actorId      String               // userId
+  notes        String?
+  createdAt    DateTime              @default(now())
+
+  schedule     MedicationSchedule    @relation(fields: [scheduleId], references: [id])
+
+  @@index([scheduleId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SYMPTOMS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model SymptomDefinition {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  pathwayId   String?
+  isSystemDefined Boolean @default(true)
+  createdAt   DateTime @default(now())
+
+  logs        SymptomLog[]
+}
+
+model SymptomLog {
+  id                 String    @id @default(uuid())
+  planId             String
+  patientProfileId   String?
+  loggedBy           String    // userId
+  symptomDefinitionId String?
+  customSymptom      String?
+  painScore          Int?      // 0–10
+  temperature        Float?    // Celsius
+  notes              String?
+  recordedAt         DateTime  @default(now())
+  createdAt          DateTime  @default(now())
+
+  plan               RecoveryPlan      @relation(fields: [planId], references: [id])
+  symptomDefinition  SymptomDefinition? @relation(fields: [symptomDefinitionId], references: [id])
+
+  @@index([planId])
+  @@index([recordedAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RED FLAGS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model RedFlagRule {
+  id                String            @id @default(uuid())
+  pathwayTemplateId String
+  ruleCode          String            @unique
+  version           Int               @default(1)
+  name              String
+  description       String
+  triggerType       String            // e.g. "fever_above_threshold", "pain_above_threshold"
+  triggerConfig     Json              // {field, operator, value, unit}
+  severity          RedFlagSeverity
+  action            RedFlagAction
+  messageTemplate   String
+  emergencyMessage  String?
+  status            RedFlagRuleStatus @default(DRAFT)
+  sourceReference   String?           // clinician review reference
+  reviewNote        String            @default("Prototype — clinician review pending")
+  isSystemRule      Boolean           @default(false)
+  deletedAt         DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  pathway           PathwayTemplate   @relation(fields: [pathwayTemplateId], references: [id])
+  events            RedFlagEvent[]
+
+  @@index([pathwayTemplateId])
+  @@index([status])
+  @@index([ruleCode])
+}
+
+model RedFlagEvent {
+  id                   String          @id @default(uuid())
+  planId               String
+  ruleId               String
+  matchedData          Json            // snapshot of what triggered
+  severity             RedFlagSeverity
+  action               RedFlagAction
+  notificationStatus   NotificationStatus @default(PENDING)
+  resolvedAt           DateTime?
+  resolvedBy           String?
+  notes                String?
+  createdAt            DateTime        @default(now())
+
+  plan                 RecoveryPlan    @relation(fields: [planId], references: [id])
+  rule                 RedFlagRule     @relation(fields: [ruleId], references: [id])
+
+  @@index([planId])
+  @@index([severity])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FOLLOW-UPS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model FollowUp {
+  id                  String   @id @default(uuid())
+  planId              String
+  appointmentType     String   // e.g. "WOUND_CHECK", "GP_REVIEW", "SPECIALIST"
+  clinicianName       String?
+  clinicianRole       String?
+  purpose             String?
+  scheduledDate       DateTime?
+  relativeDuration    Int?     // days from discharge
+  originalInstruction String?
+  sourceText          String?
+  sourcePage          Int?
+  sourceBoundingBox   Json?
+  extractionFieldId   String?
+  isConfirmed         Boolean  @default(false)
+  patientEnteredDate  DateTime?
+  notes               String?
+  deletedAt           DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  plan                RecoveryPlan  @relation(fields: [planId], references: [id])
+  pendingTests        PendingTest[]
+  notifications       Notification[]
+
+  @@index([planId])
+  @@index([scheduledDate])
+}
+
+model PendingTest {
+  id          String   @id @default(uuid())
+  followUpId  String?
+  planId      String
+  testName    String
+  purpose     String?
+  dueDate     DateTime?
+  sourceText  String?
+  isCompleted Boolean  @default(false)
+  completedAt DateTime?
+  deletedAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  followUp    FollowUp? @relation(fields: [followUpId], references: [id])
+
+  @@index([planId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DOCTOR QUESTIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model DoctorQuestion {
+  id               String   @id @default(uuid())
+  planId           String
+  questionText     String
+  context          String?
+  sourceType       String   // "UNCLEAR_FIELD", "CONDITIONAL", "MISSED_MED", "CONFLICT", etc.
+  extractionFieldId String?
+  isResolved       Boolean  @default(false)
+  resolvedAt       DateTime?
+  resolvedNote     String?
+  deletedAt        DateTime?
+  createdAt        DateTime @default(now())
+
+  plan             RecoveryPlan @relation(fields: [planId], references: [id])
+
+  @@index([planId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FAMILY / CONSENT
+// ─────────────────────────────────────────────────────────────────────────────
+
+model FamilyInvitation {
+  id               String           @id @default(uuid())
+  patientProfileId String
+  invitedByUserId  String
+  email            String?
+  phone            String?
+  tokenHash        String           @unique
+  otpCode          String?
+  permissions      CaregiverPermission[]
+  status           InvitationStatus @default(PENDING)
+  expiresAt        DateTime
+  acceptedAt       DateTime?
+  declinedAt       DateTime?
+  createdAt        DateTime         @default(now())
+
+  patientProfile   PatientProfile   @relation(fields: [patientProfileId], references: [id])
+  invitedBy        User             @relation("InvitedBy", fields: [invitedByUserId], references: [id])
+
+  @@index([tokenHash])
+  @@index([patientProfileId])
+}
+
+model FamilyMembership {
+  id               String    @id @default(uuid())
+  patientProfileId String
+  caregiverProfileId String
+  permissions      CaregiverPermission[]
+  isActive         Boolean   @default(true)
+  revokedAt        DateTime?
+  revokedBy        String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  patientProfile   PatientProfile   @relation("PatientMemberships", fields: [patientProfileId], references: [id])
+  caregiverProfile CaregiverProfile @relation("CaregiverMemberships", fields: [caregiverProfileId], references: [id])
+  consentRecords   ConsentRecord[]
+
+  @@unique([patientProfileId, caregiverProfileId])
+  @@index([patientProfileId])
+  @@index([caregiverProfileId])
+}
+
+model ConsentRecord {
+  id               String            @id @default(uuid())
+  patientProfileId String
+  membershipId     String?
+  permission       CaregiverPermission
+  status           ConsentStatus     @default(ACTIVE)
+  grantedAt        DateTime          @default(now())
+  revokedAt        DateTime?
+  actorId          String            // who made the change
+  consentVersion   String            @default("1.0")
+  notes            String?
+
+  patientProfile   PatientProfile    @relation("PatientConsents", fields: [patientProfileId], references: [id])
+  membership       FamilyMembership? @relation(fields: [membershipId], references: [id])
+
+  @@index([patientProfileId])
+  @@index([membershipId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Notification {
+  id               String             @id @default(uuid())
+  userId           String
+  type             NotificationType
+  channel          NotificationChannel
+  status           NotificationStatus @default(PENDING)
+  subject          String?
+  body             String
+  metadata         Json?
+  scheduledFor     DateTime?
+  sentAt           DateTime?
+  readAt           DateTime?
+  retryCount       Int                @default(0)
+  lastError        String?
+  idempotencyKey   String             @unique
+  medicationScheduleId String?
+  followUpId       String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  user             User               @relation(fields: [userId], references: [id])
+  medicationSchedule MedicationSchedule? @relation(fields: [medicationScheduleId], references: [id])
+  followUp         FollowUp?           @relation(fields: [followUpId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([scheduledFor])
+  @@index([idempotencyKey])
+}
+
+model NotificationPreference {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  emailEnabled  Boolean  @default(true)
+  smsEnabled    Boolean  @default(false)
+  pushEnabled   Boolean  @default(false)
+  quietHoursStart Int?   // hour 0–23
+  quietHoursEnd   Int?
+  timezone      String   @default("UTC")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUDIT
+// ─────────────────────────────────────────────────────────────────────────────
+
+model AuditEvent {
+  id           String   @id @default(uuid())
+  actorId      String?  // userId, null for system
+  actorRole    UserRole?
+  action       String   // e.g. "DOCUMENT_UPLOADED", "PLAN_CONFIRMED"
+  resourceType String
+  resourceId   String
+  planId       String?
+  documentId   String?
+  metadata     Json?    // e.g. {ip, userAgent, requestId} — no sensitive medical data
+  ipAddress    String?
+  userAgent    String?
+  requestId    String?
+  createdAt    DateTime @default(now())
+
+  actor        User?          @relation(fields: [actorId], references: [id])
+  plan         RecoveryPlan?  @relation(fields: [planId], references: [id])
+  document     SourceDocument? @relation(fields: [documentId], references: [id])
+
+  @@index([actorId])
+  @@index([resourceType, resourceId])
+  @@index([planId])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN CONFIGURATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+model AdminConfiguration {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       Json
+  description String?
+  updatedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROCESSING JOBS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ProcessingJob {
+  id            String    @id @default(uuid())
+  jobType       String    // "OCR", "EXTRACTION", "PLAN_GENERATION", etc.
+  queueJobId    String?   // BullMQ job ID
+  documentId    String?
+  planId        String?
+  status        JobStatus @default(QUEUED)
+  attempt       Int       @default(0)
+  lastError     String?
+  result        Json?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  document      SourceDocument? @relation(fields: [documentId], references: [id])
+
+  @@index([documentId])
+  @@index([status])
+  @@index([jobType])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PRIVACY / DELETION
+// ─────────────────────────────────────────────────────────────────────────────
+
+model DeletionRequest {
+  id               String               @id @default(uuid())
+  userId           String
+  status           DeletionRequestStatus @default(PENDING)
+  requestedAt      DateTime             @default(now())
+  completedAt      DateTime?
+  retentionPolicy  Json?
+  steps            Json?                // audit of deletion steps
+  notes            String?
+
+  user             User                 @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+}

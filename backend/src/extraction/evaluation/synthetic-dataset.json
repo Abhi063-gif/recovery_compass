@@ -1,0 +1,93 @@
+[
+  {
+    "id": "SYN-EVAL-001",
+    "procedure": "Laparoscopic Cholecystectomy",
+    "documentType": "DISCHARGE_SUMMARY",
+    "text": "DISCHARGE SUMMARY\nPatient: Jane Smith | Age: 42 | DOS: 2026-09-10 | DOD: 2026-09-11\nProcedure: Laparoscopic Cholecystectomy\nSurgeon: Dr. Vance\nMedications:\n- Paracetamol 1000mg QDS PO for 7 days\n- Ibuprofen 400mg TDS PO with meals for 5 days\n- Tramadol 50mg PRN severe pain (max 200mg/day)\nInstructions:\n- Incision care: Keep dry 48 hrs. Showers permitted on Day 3. Pat dry.\n- Activity: Light walking daily. No lifting over 10 lbs for 3 weeks.\n- Diet: Low fat diet for 2 weeks.\nRed Flags: Fever > 38.5C, jaundice (yellow eyes/skin), worsening right upper quadrant pain.\nFollow-up: 2 weeks outpatient clinic.",
+    "groundTruth": {
+      "surgeryType": "Laparoscopic Cholecystectomy",
+      "medicines": [
+        { "name": "Paracetamol", "dose": "1000", "doseUnit": "mg", "frequency": "four times daily", "durationDays": 7 },
+        { "name": "Ibuprofen", "dose": "400", "doseUnit": "mg", "frequency": "three times daily", "durationDays": 5 },
+        { "name": "Tramadol", "dose": "50", "doseUnit": "mg", "asNeeded": true }
+      ],
+      "restrictions": ["No lifting over 10 lbs for 3 weeks"],
+      "redFlags": ["Fever > 38.5C", "jaundice", "worsening right upper quadrant pain"],
+      "followUps": [{ "type": "outpatient clinic", "relativeDuration": "2 weeks" }]
+    }
+  },
+  {
+    "id": "SYN-EVAL-002",
+    "procedure": "Total Knee Arthroplasty",
+    "documentType": "DISCHARGE_SUMMARY",
+    "text": "ORTHOPEDIC DISCHARGE SUMMARY\nPatient: Robert Taylor | Age: 68 | DOS: 2026-09-05 | DOD: 2026-09-08\nProcedure: Left Total Knee Arthroplasty\nSurgeon: Dr. Campbell\nMedications:\n- Rivaroxaban 10mg OD PO for 14 days (anticoagulation)\n- Paracetamol 1g QDS regularly for 14 days\n- Co-codamol 30/500 2 tablets QDS PRN for breakthrough pain\n- Senna 15mg ON PRN for constipation\nInstructions:\n- Physical Therapy: Knee flexion exercises 3x daily. Full weight bearing with frame/crutches.\n- Wound care: Aquacel dressing in place. Do not disturb until staple removal on Day 12.\n- Ice operative knee 20 mins every 2 hours.\nRed Flags: Calf swelling, unilateral leg warmth, sudden chest pain or shortness of breath (suspected DVT/PE), wound soakage or active bleeding.\nFollow-up: Physiotherapy review Day 7. Orthopedic clinic Day 12 for staple removal.",
+    "groundTruth": {
+      "surgeryType": "Left Total Knee Arthroplasty",
+      "medicines": [
+        { "name": "Rivaroxaban", "dose": "10", "doseUnit": "mg", "frequency": "once daily", "durationDays": 14 },
+        { "name": "Paracetamol", "dose": "1", "doseUnit": "g", "frequency": "four times daily", "durationDays": 14 },
+        { "name": "Co-codamol", "dose": "30/500", "doseUnit": "mg", "asNeeded": true },
+        { "name": "Senna", "dose": "15", "doseUnit": "mg", "asNeeded": true }
+      ],
+      "restrictions": ["Full weight bearing with frame/crutches"],
+      "redFlags": ["Calf swelling", "unilateral leg warmth", "sudden chest pain", "shortness of breath", "wound soakage"],
+      "followUps": [
+        { "type": "Physiotherapy review", "relativeDuration": "Day 7" },
+        { "type": "Orthopedic clinic staple removal", "relativeDuration": "Day 12" }
+      ]
+    }
+  },
+  {
+    "id": "SYN-EVAL-003",
+    "procedure": "Inguinal Hernia Repair",
+    "documentType": "DISCHARGE_SUMMARY",
+    "text": "DAY SURGERY DISCHARGE NOTE\nPatient: David Miller | Age: 51 | Date: 2026-09-18\nProcedure: Right Open Inguinal Hernia Repair with Mesh\nMedications:\n- Paracetamol 500mg: 2 tabs PO QDS x 5 days\n- Naproxen 250mg: 1 tab PO BD with food x 5 days\nInstructions:\n- Ice groin area intermittently for first 24 hours.\n- Wear supportive snug underwear (briefs, not boxers).\n- Avoid straining, coughing, or heavy lifting (>5kg) for 4-6 weeks.\n- Return to sedentary work in 1-2 weeks.\nRed Flags: Inability to pass urine within 8 hours, scrotal hematoma/massive swelling, high fever (>38C).\nFollow-up: GP review in 2 weeks.",
+    "groundTruth": {
+      "surgeryType": "Right Open Inguinal Hernia Repair with Mesh",
+      "medicines": [
+        { "name": "Paracetamol", "dose": "1000", "doseUnit": "mg", "frequency": "four times daily", "durationDays": 5 },
+        { "name": "Naproxen", "dose": "250", "doseUnit": "mg", "frequency": "twice daily", "durationDays": 5 }
+      ],
+      "restrictions": ["Avoid heavy lifting (>5kg) for 4-6 weeks", "No driving for 1 week"],
+      "redFlags": ["Inability to pass urine within 8 hours", "scrotal massive swelling", "fever >38C"],
+      "followUps": [{ "type": "GP review", "relativeDuration": "2 weeks" }]
+    }
+  },
+  {
+    "id": "SYN-EVAL-004",
+    "procedure": "Emergency Appendectomy",
+    "documentType": "DISCHARGE_SUMMARY",
+    "text": "SURGICAL SUMMARY\nPatient: Emily Clark | Age: 29 | DOS: 2026-09-14 | DOD: 2026-09-15\nProcedure: Emergency Laparoscopic Appendectomy (Complicated/Suppurative)\nMedications:\n- Co-amoxiclav 625mg TDS PO to complete 7-day course (5 days remaining)\n- Paracetamol 1000mg QDS PO PRN pain\nInstructions:\n- Keep wounds covered for 48h. Showering allowed after 48h.\n- Light diet for 2 days, then normal diet as tolerated.\n- Avoid intense core exercises for 3 weeks.\nRed Flags: Persistent fever > 38.2C, abdominal distension, severe persistent nausea/vomiting.\nFollow-up: Routine surgical follow-up in 4 weeks.",
+    "groundTruth": {
+      "surgeryType": "Emergency Laparoscopic Appendectomy",
+      "medicines": [
+        { "name": "Co-amoxiclav", "dose": "625", "doseUnit": "mg", "frequency": "three times daily", "durationDays": 5 },
+        { "name": "Paracetamol", "dose": "1000", "doseUnit": "mg", "asNeeded": true }
+      ],
+      "restrictions": ["Avoid intense core exercises for 3 weeks"],
+      "redFlags": ["Persistent fever > 38.2C", "abdominal distension", "severe vomiting"],
+      "followUps": [{ "type": "Routine surgical follow-up", "relativeDuration": "4 weeks" }]
+    }
+  },
+  {
+    "id": "SYN-EVAL-005",
+    "procedure": "Elective Cesarean Delivery",
+    "documentType": "DISCHARGE_SUMMARY",
+    "text": "MATERNITY DISCHARGE SUMMARY\nPatient: Sarah Jenkins | Age: 34 | DOS: 2026-09-01 | DOD: 2026-09-03\nProcedure: Elective Lower Segment Cesarean Section (LSCS)\nMedications:\n- Paracetamol 1g QDS PO for 7 days\n- Ibuprofen 400mg TDS PO with food for 7 days\n- Enoxaparin (Clexane) 40mg SubQ OD for 10 days\n- Ferrous Fumarate 210mg OD PO for 30 days\nInstructions:\n- Keep dressing dry. Midwife to remove dressing Day 5.\n- Check fundal height and lochia daily.\n- Pelvic floor exercises may commence gently when comfortable.\n- No lifting anything heavier than baby for 6 weeks.\nRed Flags: Heavy vaginal bleeding (soaking >1 pad/hr), large clots, foul-smelling lochia, fever, severe calf pain.\nFollow-up: Community midwife home visit Day 4 & Day 10. Postnatal 6-week check with GP.",
+    "groundTruth": {
+      "surgeryType": "Elective Lower Segment Cesarean Section",
+      "medicines": [
+        { "name": "Paracetamol", "dose": "1", "doseUnit": "g", "frequency": "four times daily", "durationDays": 7 },
+        { "name": "Ibuprofen", "dose": "400", "doseUnit": "mg", "frequency": "three times daily", "durationDays": 7 },
+        { "name": "Enoxaparin", "dose": "40", "doseUnit": "mg", "frequency": "once daily", "durationDays": 10 },
+        { "name": "Ferrous Fumarate", "dose": "210", "doseUnit": "mg", "frequency": "once daily", "durationDays": 30 }
+      ],
+      "restrictions": ["No lifting anything heavier than baby for 6 weeks"],
+      "redFlags": ["Heavy vaginal bleeding", "fever", "severe calf pain", "foul-smelling lochia"],
+      "followUps": [
+        { "type": "Midwife home visit", "relativeDuration": "Day 4" },
+        { "type": "GP 6-week postnatal check", "relativeDuration": "6 weeks" }
+      ]
+    }
+  }
+]

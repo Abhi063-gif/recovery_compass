@@ -1,0 +1,38 @@
+# Compiled output
+/dist
+/build
+*.tsbuildinfo
+
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# Environment variables & local secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test coverage
+/coverage
+*.lcov
+
+# OS and IDE files
+.DS_Store
+Thumbs.db
+.vscode
+.idea
+*.swp
+*.swo
+
+# Local runtime data & uploads
+/uploads
+scratch
