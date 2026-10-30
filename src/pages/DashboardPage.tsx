@@ -232,10 +232,11 @@ export const DashboardPage: React.FC = () => {
                             e.stopPropagation();
                             speak(task.title);
                           }}
-                          className="p-1.5 text-slate-400 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition"
+                          className="flex items-center gap-1 px-2 py-1 text-slate-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition text-[11px] font-medium"
                           title={t('tapToListen')}
                         >
-                          <Volume2 className="w-4 h-4" />
+                          <Volume2 className="w-3.5 h-3.5 text-rose-600" />
+                          <span className="hidden sm:inline">{t('tapToListen')}</span>
                         </button>
                         <span
                           className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${

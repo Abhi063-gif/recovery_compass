@@ -7,7 +7,7 @@ export interface UserPersona {
   id: string;
   name: string;
   email: string;
-  role: 'PATIENT' | 'CAREGIVER' | 'ADMIN';
+  role: 'PATIENT' | 'CAREGIVER' | 'ADMIN' | 'ASHA' | 'ANM';
   description: string;
   avatarInitials: string;
   color: string;
@@ -15,39 +15,49 @@ export interface UserPersona {
 }
 
 /**
- * Demo personas — ONLY used when VITE_DEMO_MODE=true.
- * Never injected into production authentication flows.
+ * Demo personas — Indian Public Health Personas (PRD Section 10).
+ * Pre-configured for Maharashtra Block-level testing.
  */
 export const DEMO_PERSONAS: UserPersona[] = [
   {
-    id: 'usr-patient-maria',
-    name: 'Maria Gonzalez',
-    email: 'maria.gonzalez@example.com',
+    id: 'usr-patient-sharda',
+    name: 'Sharda Patil',
+    email: 'sharda.patil@rural.recoverycompass.org',
     role: 'PATIENT',
-    description: 'Patient recovering from Laparoscopic Cholecystectomy (Day 3)',
-    avatarInitials: 'MG',
+    description: 'Patient, Post-Cholecystectomy, Day 4, Shirur, Pune',
+    avatarInitials: 'SP',
     color: 'bg-rose-700',
     badge: 'Patient (Primary)',
   },
   {
-    id: 'usr-caregiver-carlos',
-    name: 'Carlos Gonzalez',
-    email: 'carlos.gonzalez@example.com',
-    role: 'CAREGIVER',
-    description: 'Family Caregiver with View Plan & Receive Alert Permissions',
-    avatarInitials: 'CG',
-    color: 'bg-emerald-700',
-    badge: 'Family Caregiver',
+    id: 'usr-asha-sunita',
+    name: 'Sunita Tai Gaikwad',
+    email: 'sunita.asha@rural.recoverycompass.org',
+    role: 'ASHA',
+    description: 'ASHA Worker, Shirur PHC Block, Pune',
+    avatarInitials: 'SG',
+    color: 'bg-amber-600',
+    badge: 'ASHA Worker',
   },
   {
-    id: 'usr-admin-jenkins',
-    name: 'Dr. Sarah Jenkins',
-    email: 'admin@recoverycompass.local',
+    id: 'usr-anm-rekha',
+    name: 'Rekha Sister Shinde',
+    email: 'rekha.anm@rural.recoverycompass.org',
+    role: 'ANM',
+    description: 'ANM Supervisor, Koregaon Bhima PHC',
+    avatarInitials: 'RS',
+    color: 'bg-teal-700',
+    badge: 'ANM Supervisor',
+  },
+  {
+    id: 'usr-dr-deshmukh',
+    name: 'Dr. Sanjay Deshmukh',
+    email: 'dr.deshmukh@rural.recoverycompass.org',
     role: 'ADMIN',
-    description: 'Surgical Clinical Pathway Lead & Safety Administrator',
-    avatarInitials: 'SJ',
+    description: 'PHC Medical Officer, Shirur',
+    avatarInitials: 'SD',
     color: 'bg-sky-700',
-    badge: 'Clinician / Admin',
+    badge: 'Medical Officer / Doctor',
   },
 ];
 
@@ -58,14 +68,18 @@ interface AuthState {
   error: string | null;
 
   // Actions
-  login: (email: string, password?: string) => Promise<boolean>;
+  login: (
+    credentials: string | { email?: string; phone?: string; password?: string; pin?: string },
+    password?: string
+  ) => Promise<boolean>;
   register: (data: {
-    email: string;
+    email?: string;
+    phone?: string;
     firstName: string;
     lastName: string;
-    role: 'PATIENT' | 'CAREGIVER';
-    phone?: string;
+    role?: 'PATIENT' | 'CAREGIVER' | 'ADMIN' | 'ASHA' | 'ANM';
     password?: string;
+    pin?: string;
     relationship?: string;
   }) => Promise<boolean>;
   logout: () => Promise<void>;
@@ -74,9 +88,9 @@ interface AuthState {
   clearError: () => void;
 
   // Demo-only actions
-  quickDemoLogin: (role?: 'PATIENT' | 'CAREGIVER' | 'ADMIN') => Promise<boolean>;
+  quickDemoLogin: (role?: 'PATIENT' | 'CAREGIVER' | 'ADMIN' | 'ASHA' | 'ANM') => Promise<boolean>;
   switchPersona: (persona: UserPersona) => void;
-  setDemoUser: (role?: 'PATIENT' | 'CAREGIVER' | 'ADMIN') => void;
+  setDemoUser: (role?: 'PATIENT' | 'CAREGIVER' | 'ADMIN' | 'ASHA' | 'ANM') => void;
 }
 
 /**
@@ -99,18 +113,29 @@ export const useAuthStore = create<AuthState>((set) => ({
         userId: DEMO_PERSONAS[0].id,
         email: DEMO_PERSONAS[0].email,
         role: DEMO_PERSONAS[0].role,
-        firstName: 'Maria',
-        lastName: 'Gonzalez',
+        firstName: 'Sharda',
+        lastName: 'Patil',
       }
     : null,
   isAuthenticated: DEMO_MODE,
   isLoading: false,
   error: null,
 
-  login: async (email, password) => {
+  login: async (credentials, password) => {
     set({ isLoading: true, error: null });
     try {
-      const res = await authApi.login({ email, password });
+      let payload: { email?: string; phone?: string; password?: string; pin?: string };
+      if (typeof credentials === 'string') {
+        if (credentials.includes('@')) {
+          payload = { email: credentials, password };
+        } else {
+          payload = { phone: credentials, pin: password, password };
+        }
+      } else {
+        payload = credentials;
+      }
+
+      const res = await authApi.login(payload);
       set({
         user: res.user,
         isAuthenticated: true,

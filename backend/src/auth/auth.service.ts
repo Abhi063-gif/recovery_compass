@@ -42,22 +42,48 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto, ipAddress?: string): Promise<TokenPair & { user: { userId: string; email: string; role: string; firstName: string; lastName: string } }> {
-    // Check for existing user
-    const existing = await this.prisma.user.findUnique({ where: { email: dto.email.toLowerCase() } });
-    if (existing) {
-      throw new ConflictException('A user with this email already exists');
+    let email = dto.email ? dto.email.toLowerCase().trim() : '';
+    const phone = dto.phone ? dto.phone.trim() : undefined;
+    const cleanPhone = phone ? phone.replace(/\D/g, '') : '';
+    const secret = dto.password || dto.pin;
+
+    if (!secret || secret.length < 4) {
+      throw new BadRequestException('Password or 4-digit PIN is required (minimum 4 characters)');
     }
 
-    const passwordHash = await bcrypt.hash(dto.password, 12);
+    if (!email) {
+      if (!cleanPhone) {
+        throw new BadRequestException('Either email or mobile phone number is required');
+      }
+      email = `${cleanPhone}@rural.recoverycompass.org`;
+    }
+
+    // Check for existing user by email or phone
+    const existing = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { email },
+          ...(phone ? [{ phone }] : []),
+          ...(cleanPhone ? [{ phone: cleanPhone }, { email: `${cleanPhone}@rural.recoverycompass.org` }] : []),
+        ],
+      },
+    });
+
+    if (existing) {
+      throw new ConflictException('A user with this email or mobile phone number already exists');
+    }
+
+    const passwordHash = await bcrypt.hash(secret, 12);
 
     const user = await this.prisma.user.create({
       data: {
-        email: dto.email.toLowerCase(),
+        email,
         passwordHash,
         firstName: dto.firstName,
         lastName: dto.lastName,
         role: dto.role ?? UserRole.PATIENT,
-        phone: dto.phone,
+        phone: phone || cleanPhone,
+        isPhoneVerified: !!phone,
         patientProfile: dto.role === UserRole.PATIENT || !dto.role
           ? { create: {} }
           : undefined,
@@ -94,15 +120,35 @@ export class AuthService {
     };
   }
 
+  async validateUser(identifier: string | { email?: string; phone?: string }, secret: string): Promise<any> {
+    const ident = typeof identifier === 'string'
+      ? (identifier.includes('@') ? { email: identifier } : { phone: identifier })
+      : identifier;
 
-  async validateUser(email: string, password: string): Promise<any> {
-    const user = await this.prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-    });
+    let user: any = null;
+
+    if (ident.email) {
+      user = await this.prisma.user.findUnique({
+        where: { email: ident.email.toLowerCase().trim() },
+      });
+    } else if (ident.phone) {
+      const rawPhone = ident.phone.trim();
+      const cleanPhone = rawPhone.replace(/\D/g, '');
+      user = await this.prisma.user.findFirst({
+        where: {
+          OR: [
+            { phone: rawPhone },
+            { phone: cleanPhone },
+            { phone: `+91${cleanPhone}` },
+            { email: `${cleanPhone}@rural.recoverycompass.org` },
+          ],
+        },
+      });
+    }
 
     if (!user || !user.passwordHash) {
-      // Constant-time failure to prevent email enumeration
-      await bcrypt.compare(password, '$2a$12$invalidhashplaceholderXXXXXXXXXXXXXXXXXXXXXXXXXXXX');
+      // Constant-time failure to prevent identifier enumeration
+      await bcrypt.compare(secret, '$2a$12$invalidhashplaceholderXXXXXXXXXXXXXXXXXXXXXXXXXXXX');
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -110,7 +156,7 @@ export class AuthService {
       throw new UnauthorizedException('Account is deactivated');
     }
 
-    const valid = await bcrypt.compare(password, user.passwordHash);
+    const valid = await bcrypt.compare(secret, user.passwordHash);
     if (!valid) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -119,7 +165,16 @@ export class AuthService {
   }
 
   async login(dto: LoginDto, ipAddress?: string, userAgent?: string): Promise<TokenPair & { user: { userId: string; email: string; role: string; firstName: string; lastName: string } }> {
-    const user = await this.validateUser(dto.email, dto.password);
+    const secret = dto.password || dto.pin;
+    if (!secret) {
+      throw new BadRequestException('Password or PIN is required');
+    }
+
+    if (!dto.email && !dto.phone) {
+      throw new BadRequestException('Either email or mobile number is required');
+    }
+
+    const user = await this.validateUser({ email: dto.email, phone: dto.phone }, secret);
 
     const tokens = await this.generateTokenPair(user.id, user.email, user.role);
 

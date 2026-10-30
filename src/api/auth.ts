@@ -3,7 +3,7 @@ import { apiClient } from './client';
 export interface UserSession {
   userId: string;
   email: string;
-  role: 'PATIENT' | 'CAREGIVER' | 'ADMIN';
+  role: 'PATIENT' | 'CAREGIVER' | 'ADMIN' | 'ASHA' | 'ANM';
   firstName?: string;
   lastName?: string;
 }
@@ -19,9 +19,10 @@ export interface LoginResponse extends AuthTokens {
 
 export const authApi = {
   register: async (data: {
-    email: string;
+    email?: string;
     password?: string;
-    role: 'PATIENT' | 'CAREGIVER' | 'ADMIN';
+    pin?: string;
+    role?: 'PATIENT' | 'CAREGIVER' | 'ADMIN' | 'ASHA' | 'ANM';
     firstName: string;
     lastName: string;
     phone?: string;
@@ -34,7 +35,12 @@ export const authApi = {
     return res;
   },
 
-  login: async (data: { email: string; password?: string }): Promise<LoginResponse> => {
+  login: async (data: {
+    email?: string;
+    phone?: string;
+    password?: string;
+    pin?: string;
+  }): Promise<LoginResponse> => {
     const res = await apiClient.post<LoginResponse>('/auth/login', data, { skipAuth: true });
     if (res.accessToken) {
       apiClient.setTokens(res.accessToken, res.refreshToken);
