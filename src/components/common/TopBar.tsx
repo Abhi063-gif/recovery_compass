@@ -211,14 +211,17 @@ export const TopBar: React.FC = () => {
             <div className="flex items-center gap-1 bg-slate-100 px-2 py-1.5 rounded-xl text-xs font-semibold text-slate-700">
               <Globe className="w-3.5 h-3.5 text-slate-500" />
               <select
-                value={language}
+                value={language || 'en'}
                 onChange={(e) => setLanguage(e.target.value)}
                 className="bg-transparent border-none text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
-                title="Select language (English / हिन्दी / मराठी)"
+                title="Select language (English default)"
               >
-                <option value="en">English</option>
-                <option value="hi">हिन्दी</option>
-                <option value="mr">मराठी</option>
+                <option value="en">English (Default)</option>
+                <option value="hi">हिन्दी (Hindi)</option>
+                <option value="mr">मराठी (Marathi)</option>
+                <option value="pa">ਪੰਜਾਬੀ (Punjabi)</option>
+                <option value="bn">বাংলা (Bengali)</option>
+                <option value="ta">தமிழ் (Tamil)</option>
               </select>
             </div>
 

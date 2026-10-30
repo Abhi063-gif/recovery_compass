@@ -48,16 +48,29 @@ const DEFAULT_NOTIFICATIONS: NotificationItem[] = [
   },
 ];
 
+const getInitialLanguage = (): string => {
+  try {
+    const saved = localStorage.getItem('rc_selected_language');
+    if (saved) return saved;
+  } catch {}
+  return 'en';
+};
+
 export const useAppPreferencesStore = create<AppPreferencesState>((set, get) => ({
   isOffline: !navigator.onLine,
-  language: 'en',
+  language: getInitialLanguage(),
   role: 'patient',
   highContrast: false,
   notifications: DEFAULT_NOTIFICATIONS,
   isLoadingNotifications: false,
 
   setOffline: (status) => set({ isOffline: status }),
-  setLanguage: (lang) => set({ language: lang }),
+  setLanguage: (lang) => {
+    try {
+      localStorage.setItem('rc_selected_language', lang);
+    } catch {}
+    set({ language: lang });
+  },
   setRole: (role) => set({ role }),
   toggleHighContrast: () => set((s) => ({ highContrast: !s.highContrast })),
 
