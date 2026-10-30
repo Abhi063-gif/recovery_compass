@@ -58,7 +58,7 @@ export class PlansController {
   }
 
   @Post(':id/confirm')
-  @Roles(UserRole.PATIENT)
+  @Roles(UserRole.PATIENT, UserRole.ASHA, UserRole.ADMIN)
   @ApiOperation({
     summary: 'Confirm and activate recovery plan',
     description: 'Plan cannot become active without explicit patient confirmation.',

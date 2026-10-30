@@ -8,9 +8,11 @@ import {
   UploadedFile,
   BadRequestException,
   Req,
+  Body,
+  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiConsumes, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles, CurrentUser } from '../common/decorators';
@@ -30,26 +32,61 @@ export class DocumentsController {
   ) {}
 
   @Post('upload')
-  @Roles(UserRole.PATIENT)
+  @Roles(UserRole.PATIENT, UserRole.ASHA, UserRole.ADMIN)
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload a discharge document (PDF or image)' })
   @ApiBody({
     schema: {
       type: 'object',
-      properties: { file: { type: 'string', format: 'binary' } },
+      properties: {
+        file: { type: 'string', format: 'binary' },
+        patientProfileId: {
+          type: 'string',
+          description: 'Patient Profile ID (for ASHA/Admin assisted uploads)',
+        },
+      },
     },
+  })
+  @ApiQuery({
+    name: 'patientProfileId',
+    required: false,
+    description: 'Patient Profile ID (for ASHA/Admin assisted uploads)',
   })
   async upload(
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: any,
     @Req() req: Request,
+    @Body('patientProfileId') bodyPatientProfileId?: string,
+    @Query('patientProfileId') queryPatientProfileId?: string,
   ) {
     if (!file) throw new BadRequestException('No file provided');
 
-    const patientProfile = await this.usersService.getPatientProfile(user.sub);
+    let patientProfileId: string;
 
-    return this.documentsService.upload(file, patientProfile.id, user.sub, req.ip);
+    const providedProfileId =
+      bodyPatientProfileId ||
+      queryPatientProfileId ||
+      req.body?.patientProfileId ||
+      (req.query?.patientProfileId as string);
+
+    if (user.role === UserRole.ASHA || user.role === UserRole.ADMIN) {
+      if (providedProfileId) {
+        patientProfileId = providedProfileId;
+      } else {
+        try {
+          const patientProfile = await this.usersService.getPatientProfile(user.sub);
+          patientProfileId = patientProfile.id;
+        } catch {
+          throw new BadRequestException('patientProfileId is required for assisted upload');
+        }
+      }
+    } else {
+      const patientProfile = await this.usersService.getPatientProfile(user.sub);
+      patientProfileId = patientProfile.id;
+    }
+
+    return this.documentsService.upload(file, patientProfileId, user.sub, req.ip);
   }
 
   @Get(':id')
@@ -64,15 +101,22 @@ export class DocumentsController {
   }
 
   @Post(':id/process')
-  @Roles(UserRole.PATIENT)
+  @Roles(UserRole.PATIENT, UserRole.ASHA, UserRole.ADMIN)
   @ApiOperation({ summary: 'Trigger or re-trigger document processing' })
   async process(
     @Param('id') id: string,
     @CurrentUser() user: any,
     @Req() req: Request,
   ) {
-    const patientProfile = await this.usersService.getPatientProfile(user.sub);
-    return this.documentsService.triggerProcessing(id, patientProfile.id, user.sub);
+    let patientProfileId: string;
+    if (user.role === UserRole.ASHA || user.role === UserRole.ADMIN) {
+      const doc = await this.documentsService.findById(id);
+      patientProfileId = doc.patientProfileId;
+    } else {
+      const patientProfile = await this.usersService.getPatientProfile(user.sub);
+      patientProfileId = patientProfile.id;
+    }
+    return this.documentsService.triggerProcessing(id, patientProfileId, user.sub);
   }
 
   @Get(':id/pages')

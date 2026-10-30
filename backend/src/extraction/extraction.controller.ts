@@ -49,7 +49,7 @@ export class ExtractionController {
   }
 
   @Patch(':id/fields/:fieldId')
-  @Roles(UserRole.PATIENT)
+  @Roles(UserRole.PATIENT, UserRole.ASHA, UserRole.ADMIN)
   @ApiOperation({ summary: 'Edit an extraction field value during verification' })
   async updateField(
     @Param('id') id: string,
@@ -61,14 +61,14 @@ export class ExtractionController {
   }
 
   @Post(':id/confirm')
-  @Roles(UserRole.PATIENT)
+  @Roles(UserRole.PATIENT, UserRole.ASHA, UserRole.ADMIN)
   @ApiOperation({ summary: 'Confirm extraction after patient verification' })
   async confirm(@Param('id') id: string, @CurrentUser() user: any) {
     return this.extractionService.confirmExtraction(id, user.sub);
   }
 
   @Post(':id/mark-unclear')
-  @Roles(UserRole.PATIENT)
+  @Roles(UserRole.PATIENT, UserRole.ASHA, UserRole.ADMIN)
   @ApiOperation({ summary: 'Mark an extraction unclear — generates a doctor question' })
   async markUnclear(
     @Param('id') id: string,
