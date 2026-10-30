@@ -11,6 +11,7 @@ import { WifiOff } from 'lucide-react';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { usePlanStore } from '@/stores/usePlanStore';
 import { useFamilyStore } from '@/stores/useFamilyStore';
+import { offlineStorage } from '@/services/offlineSync';
 
 const DEMO_MODE = (import.meta as any).env?.VITE_DEMO_MODE === 'true';
 

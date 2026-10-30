@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { SymptomLog } from '@/types';
 import { symptomsApi } from '@/api/symptoms';
 import { MOCK_SYMPTOM_HISTORY } from '@/api/mocks/mockPlanData';
+import { offlineStorage } from '@/services/offlineSync';
 
 const DEMO_MODE = (import.meta as any).env?.VITE_DEMO_MODE === 'true';
 
@@ -18,7 +19,6 @@ export const useSymptomStore = create<SymptomState>((set) => ({
   history: DEMO_MODE ? MOCK_SYMPTOM_HISTORY : [],
   isLoading: false,
   error: null,
-
 
   fetchHistory: async (planId: string) => {
     set({ isLoading: true });
@@ -81,7 +81,18 @@ export const useSymptomStore = create<SymptomState>((set) => ({
         return savedLog;
       }
     } catch (err) {
-      console.warn('Backend symptom log failed, preserved locally:', err);
+      console.warn('Backend symptom log failed, queueing mutation to offlineStorage:', err);
+      try {
+        await offlineStorage.queueMutation({
+          id: tempId,
+          entity: 'symptom_log',
+          action: 'CREATE',
+          payload: localLog,
+          clientTimestamp: timestamp,
+        });
+      } catch (storageErr) {
+        console.error('Failed to queue offline symptom mutation:', storageErr);
+      }
     }
 
     return localLog;

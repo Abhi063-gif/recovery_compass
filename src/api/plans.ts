@@ -68,4 +68,9 @@ export const plansApi = {
   updateTaskStatus: async (taskId: string, status: 'SCHEDULED' | 'COMPLETED' | 'SKIPPED', notes?: string): Promise<any> => {
     return apiClient.patch<any>(`/plans/tasks/${taskId}`, { status, notes });
   },
+
+  updateTask: async (taskId: string, status: string): Promise<any> => {
+    const mappedStatus = status.toUpperCase() === 'COMPLETED' ? 'COMPLETED' : 'SCHEDULED';
+    return apiClient.patch<any>(`/plans/tasks/${taskId}`, { status: mappedStatus });
+  },
 };

@@ -18,11 +18,14 @@ import {
   Shield,
   Globe,
   Download,
+  CloudOff,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { usePlanStore } from '@/stores/usePlanStore';
 import { useAppPreferencesStore } from '@/stores/useAppPreferencesStore';
 import { downloadRecoveryCalendar } from '@/services/calendarExport';
+import { offlineStorage } from '@/services/offlineSync';
 import { AuthModal } from './AuthModal';
 
 export const TopBar: React.FC = () => {
@@ -30,11 +33,51 @@ export const TopBar: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated, logout } = useAuthStore();
   const { plan, loadDemoPatient } = usePlanStore();
-  const { notifications, markNotificationRead, clearAllNotifications, language, setLanguage } = useAppPreferencesStore();
+  const { notifications, markNotificationRead, clearAllNotifications, language, setLanguage, isOffline } = useAppPreferencesStore();
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+
+    const [outboxCount, setOutboxCount] = useState<number>(0);
+  const [isSyncingOutbox, setIsSyncingOutbox] = useState<boolean>(false);
+
+  React.useEffect(() => {
+    const checkOutbox = async () => {
+      try {
+        const items = await offlineStorage.getOutbox();
+        setOutboxCount(items.length);
+      } catch {
+        setOutboxCount(0);
+      }
+    };
+
+    checkOutbox();
+    const interval = setInterval(checkOutbox, 3000);
+
+    const handleOnline = () => {
+      offlineStorage.syncOutbox().then(() => checkOutbox()).catch(() => {});
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, []);
+
+  const handleManualSync = async () => {
+    setIsSyncingOutbox(true);
+    try {
+      await offlineStorage.syncOutbox();
+      const items = await offlineStorage.getOutbox();
+      setOutboxCount(items.length);
+    } catch (err) {
+      console.warn('Manual sync failed:', err);
+    } finally {
+      setIsSyncingOutbox(false);
+    }
+  };
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
@@ -138,6 +181,30 @@ export const TopBar: React.FC = () => {
 
           {/* Right Actions */}
           <div className="flex items-center gap-2 shrink-0">
+            {/* Offline / Outbox Sync Status Indicator */}
+            {isOffline || outboxCount > 0 ? (
+              <div className="flex items-center gap-1.5">
+                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                  <CloudOff className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Saved on phone (Offline){outboxCount > 0 ? ` (${outboxCount})` : ''}</span>
+                </span>
+                <button
+                  onClick={handleManualSync}
+                  disabled={isSyncingOutbox}
+                  className="flex items-center gap-1 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1.5 rounded-xl shadow-sm transition disabled:opacity-50"
+                  title="Sync pending changes with server"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingOutbox ? 'animate-spin' : ''}`} />
+                  <span>{isSyncingOutbox ? 'Syncing...' : 'Sync Now'}</span>
+                </button>
+              </div>
+            ) : (
+              <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Synced ✓</span>
+              </div>
+            )}
+
             {/* Language Selector */}
             <div className="flex items-center gap-1 bg-slate-100 px-2 py-1.5 rounded-xl text-xs font-semibold text-slate-700">
               <Globe className="w-3.5 h-3.5 text-slate-500" />

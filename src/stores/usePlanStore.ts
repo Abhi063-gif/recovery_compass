@@ -262,6 +262,23 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       },
     }));
 
+    try {
+      await plansApi.updateTask(taskId, newStatus);
+    } catch (err) {
+      console.warn('Backend updateTask offline or failed, queuing to offlineStorage outbox:', err);
+      try {
+        await offlineStorage.queueMutation({
+          id: `task-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          entity: 'task_event',
+          action: 'UPDATE',
+          payload: { taskId, status: newStatus },
+          clientTimestamp: new Date().toISOString(),
+        });
+      } catch (storageErr) {
+        console.error('Failed to queue offline task mutation:', storageErr);
+      }
+    }
+
     get().saveOfflineSnapshot();
   },
 
@@ -494,6 +511,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     } catch (e) {
       // LocalStorage quota or disabled
     }
+    offlineStorage.savePlanSnapshot(get().plan).catch(() => {});
   },
 
   loadOfflineSnapshot: () => {
