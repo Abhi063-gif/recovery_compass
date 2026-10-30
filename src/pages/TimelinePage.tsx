@@ -34,6 +34,7 @@ import {
   Shield,
 } from 'lucide-react';
 import { usePlanStore } from '@/stores/usePlanStore';
+import { useTranslation } from '@/services/i18n';
 import { format, addDays, parseISO, isValid } from 'date-fns';
 
 // Total recovery days per PRD v3.0
@@ -100,6 +101,7 @@ function getDayFollowUps(followUps: any[], dischargeDate: string, dayNumber: num
 
 export const TimelinePage: React.FC = () => {
   const { plan, activeTimelineDay, setActiveTimelineDay, toggleTaskStatus } = usePlanStore();
+  const { t } = useTranslation();
 
   const hasPlan = !!plan.id;
   const currentDay = activeTimelineDay || 1;
@@ -134,7 +136,7 @@ export const TimelinePage: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Recovery Timeline</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{t('timeline')}</h1>
           <p className="text-xs text-slate-500 mt-0.5">
             Day-by-day guidance based on your verified discharge instructions.
           </p>
@@ -171,7 +173,9 @@ export const TimelinePage: React.FC = () => {
               {Array.from({ length: TOTAL_RECOVERY_DAYS }, (_, i) => i + 1).map((day) => {
                 const isSelected = day === currentDay;
                 const isToday = plan.currentDay === day;
-                const hasContent = dayTasks.length > 0 || dayMedications.length > 0;
+                const specificDayTasks = getDayTasks(plan.tasks || [], day);
+                const specificDayMeds = getDayMedications(plan.medications || [], dischargeDate, day);
+                const hasContent = specificDayTasks.length > 0 || specificDayMeds.length > 0;
 
                 return (
                   <button
@@ -186,9 +190,12 @@ export const TimelinePage: React.FC = () => {
                     }`}
                   >
                     <span className={`text-[10px] uppercase ${isSelected ? 'text-sky-100 font-bold' : isToday ? 'text-sky-600' : 'text-slate-400'}`}>
-                      {isToday ? 'TODAY' : 'DAY'}
+                      {isToday ? t('today').toUpperCase() : `${t('day').toUpperCase()}`}
                     </span>
                     <span className="text-base font-extrabold leading-none mt-0.5">{day}</span>
+                    {hasContent && (
+                      <span className={`w-1.5 h-1.5 rounded-full mt-1 ${isSelected ? 'bg-white' : 'bg-rose-500'}`} />
+                    )}
                   </button>
                 );
               })}
@@ -200,7 +207,7 @@ export const TimelinePage: React.FC = () => {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
                 <h2 className="font-bold text-base text-slate-900">
-                  Day {currentDay} — {dayDate}
+                  {t('day')} {currentDay} — {dayDate}
                 </h2>
                 <p className="text-[11px] text-slate-400 mt-0.5">
                   Post-discharge Day {currentDay} •{' '}
@@ -210,7 +217,7 @@ export const TimelinePage: React.FC = () => {
               {plan.isConfirmed && (
                 <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 flex items-center gap-1">
                   <Shield className="w-3 h-3" />
-                  Verified
+                  {t('verified')}
                 </span>
               )}
             </div>
@@ -236,7 +243,7 @@ export const TimelinePage: React.FC = () => {
                     <div className="p-2 bg-sky-100 text-sky-700 rounded-xl">
                       <Pill className="w-4 h-4" />
                     </div>
-                    <span className="text-xs font-bold text-slate-900">Medicines</span>
+                    <span className="text-xs font-bold text-slate-900">{t('medicines')}</span>
                   </div>
                   {dayMedications.map((med) => (
                     <div key={med.id} className="flex items-start justify-between gap-2 pl-2">
@@ -272,7 +279,7 @@ export const TimelinePage: React.FC = () => {
                     <div className="p-2 bg-emerald-100 text-emerald-700 rounded-xl">
                       <CheckCircle2 className="w-4 h-4" />
                     </div>
-                    <span className="text-xs font-bold text-slate-900">Tasks</span>
+                    <span className="text-xs font-bold text-slate-900">{t('tasks')}</span>
                   </div>
                   {dayTasks.map((task) => {
                     const isCompleted = task.status === 'completed' || task.status === 'COMPLETED';
@@ -310,7 +317,7 @@ export const TimelinePage: React.FC = () => {
                     <div className="p-2 bg-red-100 text-red-700 rounded-xl">
                       <AlertTriangle className="w-4 h-4" />
                     </div>
-                    <span className="text-xs font-bold text-slate-900">Restrictions</span>
+                    <span className="text-xs font-bold text-slate-900">{t('restrictions')}</span>
                   </div>
                   <ul className="pl-2 space-y-1">
                     {activeRestrictions.map((r: any, idx) => (
@@ -330,7 +337,7 @@ export const TimelinePage: React.FC = () => {
                     <div className="p-2 bg-purple-100 text-purple-700 rounded-xl">
                       <Calendar className="w-4 h-4" />
                     </div>
-                    <span className="text-xs font-bold text-slate-900">Appointments</span>
+                    <span className="text-xs font-bold text-slate-900">{t('appointments')}</span>
                   </div>
                   {dayFollowUps.map((fu) => (
                     <div key={fu.id} className="pl-2">
@@ -369,7 +376,7 @@ export const TimelinePage: React.FC = () => {
                 className="px-4 py-2 text-slate-600 hover:text-slate-900 font-semibold text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <ChevronLeft className="w-4 h-4" />
-                <span>Previous Day</span>
+                <span>{t('previousDay')}</span>
               </button>
 
               <span className="text-xs text-slate-400 font-medium">
@@ -381,7 +388,7 @@ export const TimelinePage: React.FC = () => {
                 disabled={currentDay === TOTAL_RECOVERY_DAYS}
                 className="px-5 py-2.5 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition"
               >
-                <span>Next Day</span>
+                <span>{t('nextDay')}</span>
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>

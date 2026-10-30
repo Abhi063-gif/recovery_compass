@@ -18,17 +18,20 @@ import {
   ChevronRight,
   FileText,
   Upload,
+  Volume2,
 } from 'lucide-react';
 import { usePlanStore } from '@/stores/usePlanStore';
 import { useAppPreferencesStore } from '@/stores/useAppPreferencesStore';
 import { useSafetyStore } from '@/stores/useSafetyStore';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { useTranslation } from '@/services/i18n';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { plan, toggleTaskStatus, recordMedicationAction, isSyncing } = usePlanStore();
   const triggerManualEmergency = useSafetyStore((s) => s.triggerManualEmergency);
   const { user } = useAuthStore();
+  const { t, speak } = useTranslation();
 
   const hasPlan = !!plan.id;
   const currentDay = plan.currentDay || 1;
@@ -134,7 +137,7 @@ export const DashboardPage: React.FC = () => {
               </div>
 
               <div>
-                <span className="text-xs font-bold text-slate-900 block">Today's Progress</span>
+                <span className="text-xs font-bold text-slate-900 block">{t('todaysProgress')}</span>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {completedTasksCount} of {totalTasksCount} daily recovery tasks completed.
                 </p>
@@ -176,7 +179,7 @@ export const DashboardPage: React.FC = () => {
           {/* Today's Tasks List */}
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-card space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <h2 className="font-bold text-base text-slate-900">Today's Tasks</h2>
+              <h2 className="font-bold text-base text-slate-900">{t('todaysTasks')}</h2>
               <span className="text-xs text-slate-500 font-semibold">
                 Day {currentDay} of {plan.totalDays || '—'}
               </span>
@@ -223,6 +226,17 @@ export const DashboardPage: React.FC = () => {
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            speak(task.title);
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition"
+                          title={t('tapToListen')}
+                        >
+                          <Volume2 className="w-4 h-4" />
+                        </button>
                         <span
                           className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
                             isCompleted
@@ -230,7 +244,7 @@ export const DashboardPage: React.FC = () => {
                               : 'bg-amber-100 text-amber-800'
                           }`}
                         >
-                          {isCompleted ? 'Completed' : 'Pending'}
+                          {isCompleted ? t('completed') : t('pending')}
                         </span>
                         <ChevronRight className="w-4 h-4 text-slate-400" />
                       </div>

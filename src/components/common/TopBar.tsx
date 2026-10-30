@@ -26,11 +26,13 @@ import { usePlanStore } from '@/stores/usePlanStore';
 import { useAppPreferencesStore } from '@/stores/useAppPreferencesStore';
 import { downloadRecoveryCalendar } from '@/services/calendarExport';
 import { offlineStorage } from '@/services/offlineSync';
+import { useTranslation } from '@/services/i18n';
 import { AuthModal } from './AuthModal';
 
 export const TopBar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { user, isAuthenticated, logout } = useAuthStore();
   const { plan, loadDemoPatient } = usePlanStore();
   const { notifications, markNotificationRead, clearAllNotifications, language, setLanguage, isOffline } = useAppPreferencesStore();
@@ -99,16 +101,16 @@ export const TopBar: React.FC = () => {
   };
 
   const navLinks = [
-    { to: '/dashboard', label: 'Today' },
-    { to: '/timeline', label: '15-Day Plan' },
-    { to: '/medications', label: 'Medications' },
-    { to: '/symptoms/log', label: 'Symptoms' },
-    { to: '/schemes', label: 'Govt Schemes' },
-    { to: '/facilities', label: 'Nearby PHCs' },
-    { to: '/asha', label: 'ASHA Caseload' },
-    { to: '/anm', label: 'ANM Review' },
-    ...(plan.id ? [{ to: `/verification/${plan.id}`, label: 'Verification' }] : []),
-    { to: '/family', label: 'Family' },
+    { to: '/dashboard', label: t('today') },
+    { to: '/timeline', label: t('timeline') },
+    { to: '/medications', label: t('medications') },
+    { to: '/symptoms/log', label: t('symptoms') },
+    { to: '/schemes', label: t('schemes') },
+    { to: '/facilities', label: t('facilities') },
+    { to: '/asha', label: t('ashaCaseload') },
+    { to: '/anm', label: t('anmReview') },
+    ...(plan.id ? [{ to: `/verification/${plan.id}`, label: t('verification') }] : []),
+    { to: '/family', label: t('family') },
   ];
 
   const currentInitials = user?.firstName

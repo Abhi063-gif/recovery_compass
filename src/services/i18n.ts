@@ -9,6 +9,8 @@
  * Includes text-to-speech (TTS) voice guidance for low-literacy rural patients.
  */
 
+import { useAppPreferencesStore } from '@/stores/useAppPreferencesStore';
+
 export type LanguageCode = 'en' | 'hi' | 'mr';
 
 export interface Translations {
@@ -20,18 +22,24 @@ export interface Translations {
   schemes: string;
   facilities: string;
   ashaCaseload: string;
+  anmReview: string;
+  family: string;
+  verification: string;
   day: string;
   takeMedicine: string;
   completed: string;
   pending: string;
   emergencyTitle: string;
   emergencySubtitle: string;
+  emergencyHelp: string;
   callAmbulance: string;
   verifiedPlan: string;
+  verified: string;
   savedOffline: string;
   syncNow: string;
   synced: string;
   readAloud: string;
+  tapToListen: string;
   uploadDischarge: string;
   verificationBadge: string;
   restrictions: string;
@@ -42,33 +50,46 @@ export interface Translations {
   riskTierHigh: string;
   riskTierMedium: string;
   riskTierLow: string;
+  todaysProgress: string;
+  todaysTasks: string;
+  medicines: string;
+  tasks: string;
+  appointments: string;
+  previousDay: string;
+  nextDay: string;
 }
 
 export const TRANSLATIONS: Record<LanguageCode, Translations> = {
   en: {
     today: 'Today',
-    timeline: '15-Day Timeline',
+    timeline: '15-Day Plan',
     medications: 'Medications',
-    symptoms: 'Symptom Log',
+    symptoms: 'Symptoms',
     safety: 'Red Flags & Safety',
     schemes: 'Govt Schemes',
-    facilities: 'Nearby Facilities',
+    facilities: 'Nearby PHCs',
     ashaCaseload: 'ASHA Caseload',
+    anmReview: 'ANM Review',
+    family: 'Family',
+    verification: 'Verification',
     day: 'Day',
     takeMedicine: 'Take Medicine',
     completed: 'Completed',
     pending: 'Pending',
     emergencyTitle: 'Medical Emergency?',
     emergencySubtitle: 'If you have heavy bleeding, severe breathlessness or chest pain:',
+    emergencyHelp: 'Emergency / Urgent Help',
     callAmbulance: 'Call 108 Ambulance',
     verifiedPlan: 'Verified Recovery Plan',
+    verified: 'Verified',
     savedOffline: 'Saved on phone (Offline ready)',
     syncNow: 'Sync Now',
     synced: 'Fully Synced',
     readAloud: 'Read aloud',
+    tapToListen: 'Tap to listen',
     uploadDischarge: 'Upload Discharge Summary',
     verificationBadge: 'Clinician Verified',
-    restrictions: 'Activity Restrictions',
+    restrictions: 'Restrictions',
     followUp: 'Next Follow-up',
     doctorQuestions: 'Questions for Doctor',
     familyCircle: 'Family Circle',
@@ -76,28 +97,41 @@ export const TRANSLATIONS: Record<LanguageCode, Translations> = {
     riskTierHigh: 'High Risk (Red)',
     riskTierMedium: 'Moderate Risk (Amber)',
     riskTierLow: 'Stable (Green)',
+    todaysProgress: "Today's Progress",
+    todaysTasks: "Today's Tasks",
+    medicines: 'Medicines',
+    tasks: 'Tasks',
+    appointments: 'Appointments',
+    previousDay: 'Previous Day',
+    nextDay: 'Next Day',
   },
   hi: {
-    today: 'आज का दिन',
-    timeline: '15-दिवसीय समयरेखा',
+    today: 'आज',
+    timeline: '15-दिवसीय योजना',
     medications: 'दवाइयाँ',
-    symptoms: 'लक्षण दर्ज करें',
+    symptoms: 'लक्षण',
     safety: 'खतरे के संकेत (रेड फ्लैग)',
     schemes: 'सरकारी योजनाएँ',
     facilities: 'निकटतम स्वास्थ्य केंद्र',
     ashaCaseload: 'आशा कार्यकर्ता सूची',
+    anmReview: 'एएनएम समीक्षा',
+    family: 'परिवार',
+    verification: 'सत्यापन',
     day: 'दिन',
     takeMedicine: 'दवा लें',
     completed: 'पूर्ण हुआ',
     pending: 'शेष',
     emergencyTitle: 'आपातकालीन स्थिति?',
     emergencySubtitle: 'यदि अत्यधिक रक्तस्राव, सांस फूलना या सीने में दर्द हो:',
+    emergencyHelp: 'आपातकालीन / तात्कालिक सहायता',
     callAmbulance: '108 एम्बुलेंस को कॉल करें',
     verifiedPlan: 'सत्यापित देखभाल योजना',
+    verified: 'सत्यापित',
     savedOffline: 'फोन पर सुरक्षित (ऑफलाइन उपलब्ध)',
     syncNow: 'अभी सिंक करें',
     synced: 'सिंक हो गया',
     readAloud: 'आवाज़ में सुनें',
+    tapToListen: 'आवाज़ में सुनें',
     uploadDischarge: 'डिस्चार्ज पर्ची अपलोड करें',
     verificationBadge: 'डॉक्टर द्वारा सत्यापित',
     restrictions: 'परहेज़ व सावधानियाँ',
@@ -108,28 +142,41 @@ export const TRANSLATIONS: Record<LanguageCode, Translations> = {
     riskTierHigh: 'उच्च जोखिम (लाल)',
     riskTierMedium: 'मध्यम जोखिम (पीला)',
     riskTierLow: 'सामान्य (हरा)',
+    todaysProgress: 'आज की प्रगति',
+    todaysTasks: 'आज के कार्य',
+    medicines: 'दवाइयाँ',
+    tasks: 'कार्य',
+    appointments: 'जांच व मुलाकात',
+    previousDay: 'पिछला दिन',
+    nextDay: 'अगला दिन',
   },
   mr: {
-    today: 'आजचा दिवस',
-    timeline: '१५-दिवसीय पुनर्प्राप्ती',
+    today: 'आज',
+    timeline: '१५-दिवसीय आराखडा',
     medications: 'औषधे',
-    symptoms: 'लक्षण नोंद',
+    symptoms: 'लक्षणे',
     safety: 'धोक्याचे संकेत (रेड फ्लॅग)',
     schemes: 'सरकारी योजना',
     facilities: 'जवळचे आरोग्य केंद्र',
     ashaCaseload: 'आशा सेविका यादी',
+    anmReview: 'एएनएम तपासणी',
+    family: 'कुटुंब',
+    verification: 'पडताळणी',
     day: 'दिवस',
     takeMedicine: 'औषध घ्या',
     completed: 'पूर्ण झाले',
     pending: 'बाकी',
     emergencyTitle: 'तात्काळ वैद्यकीय मदत हवी आहे?',
     emergencySubtitle: 'जास्त रक्तस्राव, धाप लागणे किंवा छातीत तीव्र वेदना असल्यास:',
+    emergencyHelp: 'तात्काळ / आणीबाणी मदत',
     callAmbulance: '१०८ रुग्णवाहिकेला फोन करा',
     verifiedPlan: 'तपासलेली उपचार योजना',
+    verified: 'तपासलेले',
     savedOffline: 'मोबाईलवर सुरक्षित (ऑफलाईन कार्यक्षम)',
     syncNow: 'आता सिंक करा',
     synced: 'सिंक पूर्ण',
     readAloud: 'आवाजात ऐका',
+    tapToListen: 'आवाजात ऐका',
     uploadDischarge: 'डिस्चार्ज कार्ड अपलोड करा',
     verificationBadge: 'वैद्यकीय तपासणी पूर्ण',
     restrictions: 'सावधगिरी व बंधने',
@@ -140,6 +187,13 @@ export const TRANSLATIONS: Record<LanguageCode, Translations> = {
     riskTierHigh: 'उच्च धोका (लाल)',
     riskTierMedium: 'मध्यम धोका (पिवळा)',
     riskTierLow: 'सुरक्षित (हिरवा)',
+    todaysProgress: 'आजची प्रगती',
+    todaysTasks: 'आजची कामे',
+    medicines: 'औषधे',
+    tasks: 'कामे',
+    appointments: 'तपासणी व भेटी',
+    previousDay: 'मागील दिवस',
+    nextDay: 'पुढील दिवस',
   },
 };
 
@@ -174,4 +228,26 @@ export function speakText(text: string, lang: LanguageCode = 'en'): void {
   }
 
   window.speechSynthesis.speak(utterance);
+}
+
+/**
+ * React hook for UI localization and voice assistance
+ */
+export function useTranslation() {
+  const language = useAppPreferencesStore((s) => s.language) as LanguageCode;
+  const currentLanguage: LanguageCode = (language in TRANSLATIONS) ? language : 'en';
+
+  const t = (key: keyof Translations): string => {
+    return TRANSLATIONS[currentLanguage]?.[key] || TRANSLATIONS.en[key] || (key as string);
+  };
+
+  const speak = (text: string): void => {
+    speakText(text, currentLanguage);
+  };
+
+  return {
+    t,
+    currentLanguage,
+    speak,
+  };
 }
