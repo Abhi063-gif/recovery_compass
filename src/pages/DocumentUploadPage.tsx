@@ -12,9 +12,11 @@ import {
   ArrowRight,
   Edit3,
   Lock,
-  ChevronLeft
+  ChevronLeft,
+  Loader2,
 } from 'lucide-react';
 import { usePlanStore } from '@/stores/usePlanStore';
+import { documentsApi } from '@/api/documents';
 
 export const DocumentUploadPage: React.FC = () => {
   const navigate = useNavigate();
@@ -24,6 +26,8 @@ export const DocumentUploadPage: React.FC = () => {
   const [qualityState, setQualityState] = useState<'good' | 'blurry' | 'glare' | 'unreadable'>('good');
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [manualText, setManualText] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const handleFileSelect = (fileOrName: File | string, sizeStr?: string) => {
     if (typeof fileOrName === 'string') {
@@ -51,8 +55,32 @@ export const DocumentUploadPage: React.FC = () => {
     setQualityState('good');
   };
 
-  const handleStartProcessing = () => {
-    navigate('/documents/processing/doc-90284');
+  const handleStartProcessing = async () => {
+    setIsUploading(true);
+    setUploadError(null);
+
+    const file = uploadedFile?.fileObj;
+    if (file) {
+      try {
+        const uploadRes = await documentsApi.upload(file);
+        const docId = uploadRes.id || uploadRes.documentId;
+        if (docId) {
+          usePlanStore.getState().uploadedFile = { ...uploadedFile, fileObj: file };
+          try {
+            await documentsApi.triggerProcessing(docId);
+          } catch (pErr) {
+            console.warn('Backend trigger processing skipped/deferred:', pErr);
+          }
+          navigate(`/documents/processing/${docId}`);
+          return;
+        }
+      } catch (err: any) {
+        console.warn('Backend document upload skipped or failed, using local/demo session:', err);
+      }
+    }
+
+    const localId = `doc-local-${Date.now()}`;
+    navigate(`/documents/processing/${localId}`);
   };
 
   return (
@@ -187,7 +215,7 @@ export const DocumentUploadPage: React.FC = () => {
             </button>
 
             <button
-              disabled={!uploadedFile}
+              disabled={!uploadedFile || isUploading}
               onClick={handleStartProcessing}
               className={`px-6 py-2.5 rounded-xl font-bold text-xs transition flex items-center gap-2 ${
                 uploadedFile
@@ -195,7 +223,8 @@ export const DocumentUploadPage: React.FC = () => {
                   : 'bg-slate-200 text-slate-400 cursor-not-allowed'
               }`}
             >
-              <span>Next</span>
+              {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              <span>{isUploading ? 'Uploading document...' : 'Next'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
