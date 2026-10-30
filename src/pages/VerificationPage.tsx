@@ -19,10 +19,11 @@ import {
   Volume2,
 } from 'lucide-react';
 import { usePlanStore } from '@/stores/usePlanStore';
-import { ExtractionField } from '@/types';
+import { ExtractionField, ItemCategory, ConfidenceLevel, ItemStatus } from '@/types';
 import { ConfidenceBadge } from '@/components/common/ConfidenceBadge';
 import { SYNTHETIC_DISCHARGE_TEXT } from '@/api/mocks/mockPlanData';
 import { documentsApi } from '@/api/documents';
+import { extractionApi } from '@/api/extraction';
 import { speakText } from '@/services/i18n';
 
 export const VerificationPage: React.FC = () => {
@@ -33,6 +34,7 @@ export const VerificationPage: React.FC = () => {
     setSelectedExtractionId,
     updateExtractionField,
     confirmAllExtractions,
+    setExtractions,
   } = usePlanStore();
 
   const { planId } = useParams<{ planId: string }>();
@@ -44,18 +46,134 @@ export const VerificationPage: React.FC = () => {
   const [editValue, setEditValue] = useState<string>('');
   const [pageNumber, setPageNumber] = useState(1);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (planId && !planId.includes('demo') && !planId.includes('chole')) {
-      documentsApi.getPages(planId).then((pages) => {
-        if (Array.isArray(pages) && pages.length > 0) {
-          const combined = pages.map((p: any) => p.text || p.content || '').join('\n\n--- PAGE BREAK ---\n\n');
-          if (combined.trim()) setRealDocumentText(combined);
+      const loadRealData = async () => {
+        try {
+          let extractionData: any = null;
+          let docId = planId;
+
+          // Attempt 1: Fetch directly from extractionApi
+          try {
+            extractionData = await extractionApi.getById(planId);
+            if (extractionData?.documentId) {
+              docId = extractionData.documentId;
+            }
+          } catch {
+            // Attempt 2: Fetch document to get its extractionId
+            try {
+              const doc = await documentsApi.getById(planId);
+              if (doc?.extractionId) {
+                extractionData = await extractionApi.getById(doc.extractionId);
+              }
+              if (doc?.id) {
+                docId = doc.id;
+              }
+            } catch {
+              // ignore
+            }
+          }
+
+          // Map extraction fields if available
+          if (extractionData && Array.isArray(extractionData.fields) && extractionData.fields.length > 0) {
+            const categoryMap: Record<string, ItemCategory> = {
+              MEDICINES: 'medication',
+              FOLLOW_UPS: 'follow_up',
+              TESTS: 'test',
+              RESTRICTIONS: 'restriction',
+              DIET: 'diet_hydration',
+              HYDRATION: 'diet_hydration',
+              TASKS: 'task',
+              SYMPTOMS: 'red_flag',
+              RED_FLAGS: 'red_flag',
+              CONDITIONAL_INSTRUCTIONS: 'task',
+            };
+
+            const mappedFields: ExtractionField[] = extractionData.fields.map((f: any) => {
+              let confidenceLevel: ConfidenceLevel = 'medium';
+              if (f.confidenceLevel) {
+                const cl = String(f.confidenceLevel).toLowerCase();
+                if (cl === 'high') confidenceLevel = 'high';
+                else if (cl === 'low' || cl === 'uncertain') confidenceLevel = 'low';
+                else confidenceLevel = 'medium';
+              } else if (typeof f.confidence === 'number') {
+                confidenceLevel = f.confidence >= 0.85 ? 'high' : f.confidence >= 0.65 ? 'medium' : 'low';
+              }
+
+              let status: ItemStatus = 'pending_verification';
+              if (f.validationStatus === 'CONFIRMED') {
+                status = 'confirmed';
+              } else if (f.isUnclear || f.validationStatus === 'UNCLEAR') {
+                status = 'unclear';
+              } else if (f.category === 'CONDITIONAL_INSTRUCTIONS') {
+                status = 'conditional';
+              }
+
+              let validationStatus: 'valid' | 'warning' | 'unclear' | 'conditional' = 'valid';
+              if (f.isUnclear || f.validationStatus === 'UNCLEAR') {
+                validationStatus = 'unclear';
+              } else if (f.validationStatus === 'CONFLICT' || f.validationStatus === 'SUSPECTED_EXTRACTION_ERROR') {
+                validationStatus = 'warning';
+              } else if (f.category === 'CONDITIONAL_INSTRUCTIONS') {
+                validationStatus = 'conditional';
+              }
+
+              const fieldName = f.fieldKey
+                ? f.fieldKey
+                    .replace(/[_-]/g, ' ')
+                    .replace(/\b\w/g, (char: string) => char.toUpperCase())
+                : 'Extracted Field';
+
+              return {
+                id: f.id || `field-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                category: categoryMap[f.category] || 'task',
+                fieldName,
+                value: f.editedValue || f.value || f.rawValue || '',
+                sourceText: f.sourceText || '',
+                page: typeof f.page === 'number' ? f.page : 1,
+                boundingBox: f.boundingBox
+                  ? {
+                      x: f.boundingBox.x,
+                      y: f.boundingBox.y,
+                      width: f.boundingBox.width ?? f.boundingBox.w ?? 0,
+                      height: f.boundingBox.height ?? f.boundingBox.h ?? 0,
+                    }
+                  : undefined,
+                confidence: confidenceLevel,
+                validationStatus,
+                manuallyEdited: Boolean(f.editedValue),
+                status,
+                notes: f.notes || undefined,
+                condition: f.category === 'CONDITIONAL_INSTRUCTIONS' ? (f.value || undefined) : undefined,
+              };
+            });
+
+            setExtractions(mappedFields, planId);
+          }
+
+          // Call documentsApi.getPages(docId) to load real OCR recognized text in the left-hand document viewer
+          try {
+            const pages = await documentsApi.getPages(docId);
+            if (Array.isArray(pages) && pages.length > 0) {
+              const combined = pages
+                .map((p: any) => p.rawText || p.text || p.content || '')
+                .filter(Boolean)
+                .join('\n\n--- PAGE BREAK ---\n\n');
+              if (combined.trim()) {
+                setRealDocumentText(combined);
+              }
+            }
+          } catch {
+            // fallback text remains
+          }
+        } catch (err) {
+          console.warn('Could not load real extraction fields:', err);
         }
-      }).catch(() => {
-        // Fallback
-      });
+      };
+
+      loadRealData();
     }
-  }, [planId]);
+  }, [planId, setExtractions]);
 
   const extractions = plan.extractions;
   const selectedItem = extractions.find((e) => e.id === selectedExtractionId) || extractions[0];

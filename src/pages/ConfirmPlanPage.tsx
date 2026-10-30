@@ -20,9 +20,9 @@ export const ConfirmPlanPage: React.FC = () => {
   const { plan, confirmAndActivatePlan } = usePlanStore();
   const [hasConfirmedCheckbox, setHasConfirmedCheckbox] = useState(false);
 
-  const handleActivate = () => {
+  const handleActivate = async () => {
     if (!hasConfirmedCheckbox) return;
-    confirmAndActivatePlan();
+    await confirmAndActivatePlan(plan.id);
     navigate('/dashboard');
   };
 
@@ -113,7 +113,7 @@ export const ConfirmPlanPage: React.FC = () => {
         <div className="flex items-center justify-between pt-2">
           <button
             type="button"
-            onClick={() => navigate('/verification/plan-chole-90284')}
+            onClick={() => navigate(`/verification/${plan.id || 'current'}`)}
             className="px-4 py-2.5 text-slate-600 hover:text-slate-900 font-semibold text-xs flex items-center gap-1"
           >
             <ChevronLeft className="w-4 h-4" />

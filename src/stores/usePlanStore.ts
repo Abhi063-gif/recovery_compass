@@ -66,9 +66,10 @@ interface PlanState {
   ) => void;
   startDocProcessing: (onComplete: () => void) => Promise<void>;
   setSelectedExtractionId: (id: string | null) => void;
+  setExtractions: (extractions: ExtractionField[], planId?: string) => void;
   updateExtractionField: (id: string, updates: Partial<ExtractionField>) => Promise<void>;
   confirmAllExtractions: () => Promise<void>;
-  confirmAndActivatePlan: () => Promise<void>;
+  confirmAndActivatePlan: (planId?: string) => Promise<void>;
   setActiveTimelineDay: (day: number) => void;
 
   // Task & Med Actions
@@ -153,6 +154,18 @@ export const usePlanStore = create<PlanState>((set, get) => ({
 
   setSelectedExtractionId: (id) => set({ selectedExtractionId: id }),
 
+  setExtractions: (extractions: ExtractionField[], planId?: string) => {
+    set((state) => ({
+      plan: {
+        ...state.plan,
+        ...(planId ? { id: planId } : {}),
+        extractions,
+      },
+      selectedExtractionId: extractions.length > 0 ? extractions[0].id : state.selectedExtractionId,
+    }));
+    get().saveOfflineSnapshot();
+  },
+
   updateExtractionField: async (id, updates) => {
     // 1. Optimistic UI update
     set((state) => ({
@@ -197,17 +210,21 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     get().saveOfflineSnapshot();
   },
 
-  confirmAndActivatePlan: async () => {
+  confirmAndActivatePlan: async (planId?: string) => {
+    const targetPlanId = planId || get().plan.id;
     set((state) => ({
       plan: {
         ...state.plan,
+        ...(targetPlanId ? { id: targetPlanId } : {}),
         isConfirmed: true,
         confirmedAt: new Date().toISOString(),
       },
     }));
 
     try {
-      await plansApi.confirm(get().plan.id);
+      if (targetPlanId) {
+        await plansApi.confirm(targetPlanId);
+      }
     } catch (err) {
       console.warn('Backend plan confirm skipped or offline:', err);
     }
