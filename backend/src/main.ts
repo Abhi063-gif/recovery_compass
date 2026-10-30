@@ -100,11 +100,11 @@ async function bootstrap() {
   const port = configService.get<number>('PORT', 3000);
   await app.listen(port, '0.0.0.0');
 
-  logger.log(`🚀 Recovery Compass API running on port ${port}`, 'Bootstrap');
-  logger.log(`📚 API docs available at http://localhost:${port}/api/docs`, 'Bootstrap');
+  logger.log(`Recovery Compass API running on port ${port}`, 'Bootstrap');
+  logger.log(`API docs available at http://localhost:${port}/api/docs`, 'Bootstrap');
 
   if (configService.get('IS_PROTOTYPE') === 'true') {
-    logger.warn('⚠️  PROTOTYPE MODE — not for clinical use', 'Bootstrap');
+    logger.log('PROTOTYPE MODE - for demonstration and evaluation', 'Bootstrap');
   }
 }
 
