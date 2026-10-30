@@ -20,11 +20,11 @@ export const useSafetyStore = create<SafetyState>((set) => ({
         id: `alert-${Date.now()}`,
         triggerSymptom: 'Emergency Help Triggered by User',
         severity: 'EMERGENCY',
-        actionRequired: 'Call emergency services (911 / 999) or proceed to the nearest Emergency Department immediately.',
-        sourceReference: 'Global clinician emergency protocol',
+        actionRequired: 'Call 108 for Emergency Ambulance immediately or visit the nearest Rural Hospital / Sub-District Hospital.',
+        sourceReference: 'Emergency Protocol: Call 108 (Ambulance), 104 (Health Helpline) or 112 (National Emergency)',
         timestamp: new Date().toISOString(),
-        emergencyPhone: '911',
-        doctorPhone: '+1 (555) 382-9010',
+        emergencyPhone: '108',
+        doctorPhone: '104',
       },
     });
   },
@@ -40,17 +40,39 @@ export const useSafetyStore = create<SafetyState>((set) => ({
         symptomLogId: log.id,
       });
 
-      const isTriggered = result && (result.triggered || result.hasRedFlag);
+      // Check both result.hasRedFlags AND result.hasRedFlag AND result.triggered
+      const isTriggered = Boolean(
+        result && (
+          result.hasRedFlags ||
+          result.hasRedFlag ||
+          result.triggered ||
+          (result.matches && result.matches.length > 0)
+        )
+      );
+
       if (isTriggered) {
-        const ev = result.event || {
-          id: result.eventId || `alert-${Date.now()}`,
-          ruleName: result.ruleCode || 'Clinical red-flag criteria met',
-          ruleCode: result.ruleCode || 'RF-DETECTED',
-          severity: result.severity || 'WARNING',
-          action: result.action || 'CONTACT_CLINICIAN',
-          message: result.message,
-          emergencyMessage: result.emergencyMessage,
-        };
+        // If result.matches exists and has items, use result.matches[0] as primary triggered red flag
+        const primaryMatch = result.matches && result.matches.length > 0 ? result.matches[0] : null;
+
+        const ev = primaryMatch
+          ? {
+              id: primaryMatch.ruleId || result.eventId || `alert-${Date.now()}`,
+              ruleName: primaryMatch.ruleName || primaryMatch.name || primaryMatch.ruleCode || 'Clinical red-flag criteria met',
+              ruleCode: primaryMatch.ruleCode || 'RF-DETECTED',
+              severity: primaryMatch.severity || 'WARNING',
+              action: primaryMatch.action || 'CONTACT_CLINICIAN',
+              message: primaryMatch.message,
+              emergencyMessage: primaryMatch.emergencyMessage,
+            }
+          : result.event || {
+              id: result.eventId || `alert-${Date.now()}`,
+              ruleName: result.ruleCode || 'Clinical red-flag criteria met',
+              ruleCode: result.ruleCode || 'RF-DETECTED',
+              severity: result.severity || 'WARNING',
+              action: result.action || 'CONTACT_CLINICIAN',
+              message: result.message,
+              emergencyMessage: result.emergencyMessage,
+            };
 
         const severityMap: Record<string, SafetySeverity> = {
           EMERGENCY: 'EMERGENCY',
@@ -59,6 +81,8 @@ export const useSafetyStore = create<SafetyState>((set) => ({
           INFORMATIONAL: 'NORMAL',
         };
 
+        const isEmergency = ev.severity === 'EMERGENCY' || ev.severity === 'URGENT' || ev.action === 'SEEK_EMERGENCY_HELP';
+
         const alert: SafetyAlert = {
           id: ev.id || `alert-${Date.now()}`,
           triggerSymptom: ev.ruleName || 'Clinical red-flag criteria met',
@@ -66,11 +90,11 @@ export const useSafetyStore = create<SafetyState>((set) => ({
           actionRequired:
             ev.emergencyMessage ||
             ev.message ||
-            'Please contact your surgical care team immediately.',
+            'Call 108 for Emergency Ambulance immediately or contact your clinician on 104.',
           sourceReference: `Rule: ${ev.ruleCode} (${ev.ruleName || ''})`,
           timestamp: new Date().toISOString(),
-          emergencyPhone: ev.action === 'SEEK_EMERGENCY_HELP' ? '911' : undefined,
-          doctorPhone: '+1 (555) 382-9010',
+          emergencyPhone: isEmergency ? '108' : undefined,
+          doctorPhone: '104',
         };
 
         set({ activeAlert: alert });
@@ -93,21 +117,22 @@ export const useSafetyStore = create<SafetyState>((set) => ({
           id: `alert-fallback-${Date.now()}`,
           triggerSymptom: 'Shortness of breath / Chest symptoms',
           severity: 'EMERGENCY',
-          actionRequired: 'Seek immediate Emergency Department care or call 911/999. Do not drive yourself.',
-          sourceReference: 'Offline Protocol: Discharge summary emergency warning signs',
+          actionRequired: 'Call 108 for Emergency Ambulance immediately or visit the nearest Rural Hospital / Sub-District Hospital. Do not drive yourself.',
+          sourceReference: 'Offline Protocol: Discharge summary emergency warning signs (Call 108 / 112)',
           timestamp: new Date().toISOString(),
-          emergencyPhone: '911',
-          doctorPhone: '+1 (555) 382-9010',
+          emergencyPhone: '108',
+          doctorPhone: '104',
         };
       } else if (isHighFever) {
         alert = {
           id: `alert-fallback-${Date.now()}`,
           triggerSymptom: `High temperature recorded (${log.temperature}°C >= 38.5°C)`,
           severity: 'MONITOR',
-          actionRequired: 'Contact surgical triage or on-call clinic immediately.',
+          actionRequired: 'Contact surgical triage or medical helpline (Call 104) immediately.',
           sourceReference: 'Offline Protocol: High fever warning threshold (>= 38.5°C)',
           timestamp: new Date().toISOString(),
-          doctorPhone: '+1 (555) 382-9010',
+          emergencyPhone: undefined,
+          doctorPhone: '104',
         };
       }
 

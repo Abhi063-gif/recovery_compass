@@ -85,19 +85,19 @@ export const SafetyAlertModal: React.FC = () => {
           <div className="pt-2 space-y-2.5">
             {isEmergency ? (
               <a
-                href="tel:911"
+                href={`tel:${activeAlert.emergencyPhone || '108'}`}
                 className="w-full py-3.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-red-200 transition"
               >
                 <PhoneCall className="w-5 h-5" />
-                Call Emergency Services (911)
+                Call Emergency Ambulance ({activeAlert.emergencyPhone || '108'})
               </a>
             ) : (
               <a
-                href={`tel:${plan.patientProfile.clinicPhone}`}
+                href={`tel:${activeAlert.doctorPhone || plan.patientProfile.clinicPhone}`}
                 className="w-full py-3.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-sky-100 transition"
               >
                 <PhoneCall className="w-5 h-5" />
-                Call Surgeon Clinic: {plan.patientProfile.clinicPhone}
+                Call Clinician: {activeAlert.doctorPhone || plan.patientProfile.clinicPhone}
               </a>
             )}
 

@@ -9,8 +9,19 @@ export interface SafetyCheckPayload {
 }
 
 export interface BackendSafetyEvaluation {
+  hasRedFlags?: boolean;
   hasRedFlag?: boolean;
   triggered?: boolean;
+  matches?: Array<{
+    ruleId?: string;
+    ruleCode?: string;
+    ruleName?: string;
+    name?: string;
+    severity?: 'INFORMATIONAL' | 'WARNING' | 'URGENT' | 'EMERGENCY';
+    action?: 'MONITOR' | 'CONTACT_CLINICIAN' | 'SEEK_EMERGENCY_HELP';
+    message?: string;
+    emergencyMessage?: string;
+  }>;
   severity?: 'INFORMATIONAL' | 'WARNING' | 'URGENT' | 'EMERGENCY';
   action?: 'MONITOR' | 'CONTACT_CLINICIAN' | 'SEEK_EMERGENCY_HELP';
   message?: string;

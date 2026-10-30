@@ -262,17 +262,17 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
 
-        <button
+        <a
+          href="tel:108"
           onClick={(e) => {
             e.stopPropagation();
             triggerManualEmergency();
           }}
-          className="px-4 py-2 bg-urgentRed-600 hover:bg-urgentRed-700 text-white rounded-xl text-xs font-bold shrink-0 transition shadow-sm"
+          className="px-4 py-2 bg-urgentRed-600 hover:bg-urgentRed-700 text-white rounded-xl text-xs font-bold shrink-0 transition shadow-sm inline-flex items-center justify-center"
         >
-          Call 911 / ER
-        </button>
+          Call 108 Ambulance
+        </a>
       </div>
     </div>
   );
 };
-

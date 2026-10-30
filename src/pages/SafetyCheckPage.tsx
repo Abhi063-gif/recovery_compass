@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
   PhoneCall,
@@ -11,8 +12,17 @@ import { usePlanStore } from '@/stores/usePlanStore';
 import { useSafetyStore } from '@/stores/useSafetyStore';
 
 export const SafetyCheckPage: React.FC = () => {
+  const navigate = useNavigate();
   const plan = usePlanStore((s) => s.plan);
+  const activeAlert = useSafetyStore((s) => s.activeAlert);
   const triggerManualEmergency = useSafetyStore((s) => s.triggerManualEmergency);
+
+  const warningSign = activeAlert?.triggerSymptom || 'High fever (above 38°C / 101.0°F) or persistent chills';
+  const sourceRef = activeAlert?.sourceReference || 'Source: Discharge Summary — Page 1';
+  const recommendedAction = activeAlert?.actionRequired || 'Contact your clinician immediately. Do not delay if temperature stays above 101°F.';
+  const doctorPhone = activeAlert?.doctorPhone || plan.patientProfile?.clinicPhone || '104';
+
+  const planIdToUse = plan?.id || 'plan-chole-90284';
 
   return (
     <div className="max-w-xl mx-auto py-6 space-y-6">
@@ -40,10 +50,10 @@ export const SafetyCheckPage: React.FC = () => {
                 Warning Sign
               </span>
               <h3 className="font-bold text-sm text-slate-900 mt-0.5">
-                High fever (above 38°C / 101.0°F) or persistent chills
+                {warningSign}
               </h3>
               <span className="text-[11px] text-slate-400 block mt-0.5">
-                Source: Discharge Summary — Page 1
+                {sourceRef}
               </span>
             </div>
           </div>
@@ -53,7 +63,7 @@ export const SafetyCheckPage: React.FC = () => {
               Recommended Action
             </span>
             <p className="text-xs font-semibold text-slate-800 mt-0.5">
-              Contact your clinician immediately. Do not delay if temperature stays above 101°F.
+              {recommendedAction}
             </p>
           </div>
         </div>
@@ -61,15 +71,15 @@ export const SafetyCheckPage: React.FC = () => {
         {/* Action Buttons */}
         <div className="space-y-2.5 pt-2">
           <a
-            href={`tel:${plan.patientProfile.clinicPhone}`}
+            href={`tel:${doctorPhone}`}
             className="w-full py-3.5 bg-rose-700 hover:bg-rose-800 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-2"
           >
             <PhoneCall className="w-4 h-4" />
-            <span>Call Your Clinician ({plan.patientProfile.clinicPhone})</span>
+            <span>Call Your Clinician ({doctorPhone})</span>
           </a>
 
           <button
-            onClick={() => window.location.href = '/verification/plan-chole-90284'}
+            onClick={() => navigate(`/verification/${planIdToUse}`)}
             className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition"
           >
             View Source Instructions
@@ -83,7 +93,7 @@ export const SafetyCheckPage: React.FC = () => {
             onClick={triggerManualEmergency}
             className="underline font-bold hover:text-urgentRed-900"
           >
-            seek emergency help now (911).
+            seek emergency help now: Call 108 (Ambulance) or 104 (Health Helpline).
           </button>
         </div>
       </div>
