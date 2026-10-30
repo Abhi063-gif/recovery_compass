@@ -16,6 +16,7 @@ import { documentsApi } from '@/api/documents';
 import { extractionApi } from '@/api/extraction';
 import { medicationsApi } from '@/api/medications';
 import { questionsApi } from '@/api/questions';
+import { offlineStorage } from '@/services/offlineSync';
 
 const SNAPSHOT_STORAGE_KEY = 'rc_recovery_plan_snapshot';
 const DEMO_MODE = (import.meta as any).env?.VITE_DEMO_MODE === 'true';
@@ -242,7 +243,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       plan: {
         ...state.plan,
         medications: state.plan.medications.map((m) => {
-          if (m.id === medId) {
+          if (m.id === medId || (m as any).schedules?.some((s: any) => s.id === medId)) {
             return {
               ...m,
               todayStatus: status,
@@ -254,14 +255,48 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       },
     }));
 
-    // 2. Call backend medication event endpoint
-    try {
-      await medicationsApi.logEvent(medId, {
-        status: status === 'taken' ? 'TAKEN' : 'SKIPPED',
-        notes,
-      });
-    } catch (err) {
-      console.warn('Backend medication event log skipped or offline:', err);
+    // Find the target medication and resolve a valid schedule ID
+    const med = get().plan.medications.find(
+      (m) => m.id === medId || (m as any).schedules?.some((s: any) => s.id === medId)
+    );
+    const scheduleId = (med as any)?.schedules?.find((s: any) => s.id === medId)?.id
+      || (med as any)?.schedules?.[0]?.id
+      || (medId.startsWith('sched-') ? medId : null);
+
+    // 2. Call backend medication event endpoint if schedule ID is available
+    if (scheduleId) {
+      try {
+        await medicationsApi.logEvent(scheduleId, {
+          status: status === 'taken' ? 'TAKEN' : 'SKIPPED',
+          notes,
+        });
+      } catch (err) {
+        console.warn('Backend medication event log skipped or offline:', err);
+        try {
+          await offlineStorage.queueMutation({
+            id: `med-log-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            entity: 'medication_log',
+            action: 'CREATE',
+            payload: { medicationId: med?.id || medId, scheduleId, status, notes, actedAt: now },
+            clientTimestamp: now,
+          });
+        } catch (e) {
+          console.warn('Failed to queue offline medication mutation:', e);
+        }
+      }
+    } else {
+      // Offline or client-generated plan without server schedule IDs
+      try {
+        await offlineStorage.queueMutation({
+          id: `med-log-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          entity: 'medication_log',
+          action: 'CREATE',
+          payload: { medicationId: med?.id || medId, status, notes, actedAt: now },
+          clientTimestamp: now,
+        });
+      } catch (e) {
+        console.warn('Failed to queue offline medication mutation:', e);
+      }
     }
 
     get().saveOfflineSnapshot();
@@ -351,6 +386,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
           todayStatus: 'pending' as const,
           history: [],
           instructions: med.instructions || '',
+          schedules: med.schedules || [],
         }));
 
         // Map backend tasks to frontend RecoveryTask shape

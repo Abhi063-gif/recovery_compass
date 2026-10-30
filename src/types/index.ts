@@ -54,6 +54,8 @@ export interface MedicationItem {
   todayStatus?: 'taken' | 'skipped' | 'pending';
   history: MedicationEvent[];
   condition?: string;
+  durationDays?: number;
+  schedules?: any[];
 }
 
 export interface RecoveryTask {
