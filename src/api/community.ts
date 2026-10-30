@@ -67,7 +67,9 @@ export interface Escalation {
   patientName: string;
   village?: string;
   raisedBy: string;
+  ashaWorker?: string;
   targetRole: string;
+  pathway?: string;
   severity: 'WARNING' | 'URGENT' | 'EMERGENCY';
   reason: string;
   status: 'RAISED' | 'ACKNOWLEDGED' | 'VISITED' | 'RESOLVED' | 'REFERRED';

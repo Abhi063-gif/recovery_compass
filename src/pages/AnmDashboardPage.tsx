@@ -6,30 +6,16 @@ import {
   UserCheck,
   ChevronRight,
 } from 'lucide-react';
-import { communityApi } from '@/api/community';
+import { communityApi, Escalation } from '@/api/community';
 
-interface EscalationRecord {
-  id: string;
-  patientId: string;
-  patientName: string;
-  village: string;
-  ashaWorker: string;
-  pathway: string;
-  severity: 'WARNING' | 'URGENT' | 'EMERGENCY';
-  reason: string;
-  status: 'RAISED' | 'ACKNOWLEDGED' | 'VISITED' | 'RESOLVED' | 'REFERRED';
-  createdAt: string;
-  resolutionNotes?: string;
-  referralFacility?: string;
-}
-
-const INITIAL_ESCALATIONS: EscalationRecord[] = [
+const INITIAL_ESCALATIONS: Escalation[] = [
   {
     id: 'esc-01',
     patientId: 'patient-ramesh-02',
     patientName: 'Ramesh Jadhav',
     village: 'Wagholi Rural, Haveli',
-    ashaWorker: 'Meena Thopte (ASHA)',
+    raisedBy: 'Meena Thopte (ASHA)',
+    targetRole: 'ANM',
     pathway: 'DIABETES',
     severity: 'EMERGENCY',
     reason: 'Fasting Blood Sugar > 245 mg/dL with persistent nausea, confusion and 3 missed insulin doses.',
@@ -41,7 +27,8 @@ const INITIAL_ESCALATIONS: EscalationRecord[] = [
     patientId: 'patient-sharda-01',
     patientName: 'Sharda Patil',
     village: 'Koregaon Bhima, Shirur',
-    ashaWorker: 'Sunita Kamble (ASHA)',
+    raisedBy: 'Sunita Kamble (ASHA)',
+    targetRole: 'ANM',
     pathway: 'POST_SURGERY',
     severity: 'URGENT',
     reason: 'Temperature 101.4°F on post-cholecystectomy Day 4. Incision site erythema and missed Cefuroxime.',
@@ -54,7 +41,8 @@ const INITIAL_ESCALATIONS: EscalationRecord[] = [
     patientId: 'patient-geeta-05',
     patientName: 'Geeta Shinde',
     village: 'Sanaswadi, Shirur',
-    ashaWorker: 'Sunita Kamble (ASHA)',
+    raisedBy: 'Sunita Kamble (ASHA)',
+    targetRole: 'ANM',
     pathway: 'PREGNANCY',
     severity: 'WARNING',
     reason: 'High blood pressure reading 142/92 on antenatal week 34 checkup. Trace pedal edema.',
@@ -66,9 +54,9 @@ const INITIAL_ESCALATIONS: EscalationRecord[] = [
 ];
 
 export const AnmDashboardPage: React.FC = () => {
-  const [escalations, setEscalations] = useState<EscalationRecord[]>(INITIAL_ESCALATIONS);
+  const [escalations, setEscalations] = useState<Escalation[]>(INITIAL_ESCALATIONS);
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
-  const [activeReviewEscalation, setActiveReviewEscalation] = useState<EscalationRecord | null>(null);
+  const [activeReviewEscalation, setActiveReviewEscalation] = useState<Escalation | null>(null);
   const [resolutionAction, setResolutionAction] = useState<'ACKNOWLEDGED' | 'VISITED' | 'RESOLVED' | 'REFERRED'>('REFERRED');
   const [actionNotes, setActionNotes] = useState<string>('');
   const [selectedFacility, setSelectedFacility] = useState<string>('Primary Health Centre (PHC) Koregaon Bhima');
@@ -78,12 +66,13 @@ export const AnmDashboardPage: React.FC = () => {
       .getEscalations('ANM')
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
-          const mapped: EscalationRecord[] = data.map((d: any) => ({
+          const mapped: Escalation[] = data.map((d: any) => ({
             id: d.id,
             patientId: d.patientId,
             patientName: d.patientName || d.patientId,
             village: d.village || 'Shirur Taluka',
-            ashaWorker: d.raisedBy || 'ASHA Worker',
+            raisedBy: d.raisedBy || d.ashaWorker || 'ASHA Worker',
+            targetRole: d.targetRole || 'ANM',
             pathway: d.pathway || 'POST_SURGERY',
             severity: d.severity || 'URGENT',
             reason: d.reason,
@@ -224,7 +213,7 @@ export const AnmDashboardPage: React.FC = () => {
 
                   <h3 className="text-lg font-bold text-slate-900 mt-1">{item.patientName}</h3>
                   <p className="text-xs text-slate-500">
-                    {item.village} • Raised by: <strong>{item.ashaWorker}</strong> • {item.pathway}
+                    {item.village} • Raised by: <strong>{item.raisedBy}</strong> • {item.pathway}
                   </p>
                 </div>
 
@@ -312,7 +301,7 @@ export const AnmDashboardPage: React.FC = () => {
                   Action Escalation: {activeReviewEscalation.patientName}
                 </h3>
                 <p className="text-xs text-slate-500">
-                  {activeReviewEscalation.village} • Raised by {activeReviewEscalation.ashaWorker}
+                  {activeReviewEscalation.village} • Raised by {activeReviewEscalation.raisedBy}
                 </p>
               </div>
               <button
