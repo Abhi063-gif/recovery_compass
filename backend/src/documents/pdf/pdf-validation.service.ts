@@ -1,5 +1,13 @@
+/// <reference types="multer" />
 import { Injectable, BadRequestException } from '@nestjs/common';
 import pdfParse from 'pdf-parse';
+
+export interface UploadedFileLike {
+  buffer: Buffer;
+  size: number;
+  mimetype: string;
+  originalname: string;
+}
 
 export interface PdfValidationResult {
   isValid: boolean;
@@ -24,7 +32,7 @@ export class PdfValidationService {
    * Primary entry point for validating uploaded Multer files.
    * Enforces 0-byte check, MIME check, and magic byte validation.
    */
-  async validateUploadFile(file: Express.Multer.File): Promise<void> {
+  async validateUploadFile(file: Express.Multer.File | UploadedFileLike): Promise<void> {
     if (!file) {
       throw new BadRequestException('No file provided');
     }

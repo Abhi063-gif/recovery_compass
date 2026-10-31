@@ -76,7 +76,7 @@ describe('PDF Upload, OCR, Redis & BullMQ Pipeline Robustness', () => {
       size: 0,
       mimetype: 'application/pdf',
       originalname: 'empty.pdf',
-    } as Express.Multer.File;
+    } as any;
 
     await expect(pdfValidator.validateUploadFile(emptyFile)).rejects.toThrow(BadRequestException);
     await expect(pdfValidator.validateUploadFile(emptyFile)).rejects.toThrow(/empty/i);
@@ -88,7 +88,7 @@ describe('PDF Upload, OCR, Redis & BullMQ Pipeline Robustness', () => {
       size: tinyBuffer.length,
       mimetype: 'application/pdf',
       originalname: 'tiny.pdf',
-    } as Express.Multer.File;
+    } as any;
 
     await expect(pdfValidator.validateUploadFile(tinyFile)).rejects.toThrow(/too small/i);
   });
