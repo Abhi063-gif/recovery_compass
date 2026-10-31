@@ -4,44 +4,178 @@
 
 @layer base {
   :root {
-    --brand-primary: #0284c7;
-    --brand-dark: #0369a1;
-    --bg-main: #f8fafc;
+    --brand-red: #C8103E;
+    --brand-navy: #17243A;
+    --brand-navy-secondary: #25364F;
+    --bg-main: #F5F7FA;
+    --surface-card: #FFFFFF;
+    --border-main: #E2E8F0;
+    --text-primary: #17243A;
+    --text-secondary: #64748B;
   }
 
   body {
-    background-color: #f8fafc;
-    color: #0f172a;
+    background-color: #F5F7FA;
+    color: #17243A;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     -webkit-tap-highlight-color: transparent;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #17243A;
   }
 
   /* Accessible high-contrast focus rings */
   :focus-visible {
-    outline: 2px solid #0284c7;
+    outline: 2px solid #C8103E;
     outline-offset: 2px;
   }
 }
 
-/* Custom smooth scrollbar for timeline and document viewer */
+@layer components {
+  /* Reusable Standardized Healthcare Card */
+  .rc-card {
+    background-color: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 1rem;
+    box-shadow: 0 4px 12px -2px rgba(23, 36, 58, 0.05), 0 2px 6px -1px rgba(23, 36, 58, 0.02);
+    transition: all 0.2s ease-in-out;
+  }
+  .rc-card-hover:hover {
+    box-shadow: 0 10px 20px -3px rgba(23, 36, 58, 0.08), 0 4px 8px -2px rgba(23, 36, 58, 0.03);
+    border-color: #CBD5E1;
+  }
+
+  /* Reusable Button Tokens */
+  .rc-btn-primary {
+    background-color: #C8103E;
+    color: #FFFFFF;
+    font-weight: 600;
+    padding: 0.625rem 1rem;
+    border-radius: 0.625rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: background-color 0.15s ease-in-out;
+  }
+  .rc-btn-primary:hover {
+    background-color: #A80D34;
+  }
+  .rc-btn-primary:active {
+    background-color: #8C0E2D;
+  }
+
+  .rc-btn-secondary {
+    background-color: #FFFFFF;
+    color: #17243A;
+    border: 1px solid #E2E8F0;
+    font-weight: 600;
+    padding: 0.625rem 1rem;
+    border-radius: 0.625rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: background-color 0.15s ease-in-out;
+  }
+  .rc-btn-secondary:hover {
+    background-color: #F8FAFC;
+    border-color: #CBD5E1;
+  }
+
+  .rc-btn-navy {
+    background-color: #17243A;
+    color: #FFFFFF;
+    font-weight: 600;
+    padding: 0.625rem 1rem;
+    border-radius: 0.625rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: background-color 0.15s ease-in-out;
+  }
+  .rc-btn-navy:hover {
+    background-color: #25364F;
+  }
+
+  /* Reusable Clinical Badges */
+  .rc-badge-red {
+    background-color: #FEF2F2;
+    color: #DC2626;
+    border: 1px solid #FECACA;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.625rem;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+  .rc-badge-amber {
+    background-color: #FFFBEB;
+    color: #D97706;
+    border: 1px solid #FDE68A;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.625rem;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+  .rc-badge-green {
+    background-color: #ECFDF5;
+    color: #059669;
+    border: 1px solid #A7F3D0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.625rem;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+  .rc-badge-blue {
+    background-color: #EFF6FF;
+    color: #2563EB;
+    border: 1px solid #BFDBFE;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.625rem;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+}
+
+/* Hide scrollbar utility for clean horizontal navigation */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom smooth scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: #F1F5F9;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #CBD5E1;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #94A3B8;
 }

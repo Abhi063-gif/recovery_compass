@@ -44,7 +44,11 @@ export const LoginPage: React.FC = () => {
 
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const from = (location.state as any)?.from?.pathname || '/dashboard';
+  const from =
+    typeof (location.state as any)?.from === 'string'
+      ? (location.state as any).from
+      : (location.state as any)?.from?.pathname || '/dashboard';
+  const redirectMessage = (location.state as any)?.message;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,6 +161,14 @@ export const LoginPage: React.FC = () => {
                 : 'Access your post-discharge timeline, medication charts, and safety alerts'}
             </p>
           </div>
+
+          {/* Authentication Gate Notice */}
+          {redirectMessage && (
+            <div className="mb-5 p-3.5 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3 text-xs text-amber-900 font-semibold shadow-xs">
+              <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
+              <span>{redirectMessage}</span>
+            </div>
+          )}
 
           {/* Method Switch: Mobile + PIN vs Email + Password */}
           <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl mb-4 text-xs font-bold">

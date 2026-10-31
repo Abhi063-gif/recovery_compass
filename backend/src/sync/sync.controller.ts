@@ -1,9 +1,7 @@
-import { Controller, Post, Get, Body, Query, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Get, Body, Query, Req } from '@nestjs/common';
 import { SyncService } from './sync.service';
 import { SyncPushDto, SyncPullQueryDto } from './sync.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Sync')
 @Controller({ path: 'sync', version: '1' })
@@ -12,13 +10,39 @@ export class SyncController {
 
   @Post('push')
   async push(@Body() dto: SyncPushDto, @Req() req: any) {
-    const userId = req.user?.id || 'anonymous-offline-client';
+    let userId = req.user?.id;
+    if (!userId && req.headers?.authorization?.startsWith('Bearer ')) {
+      try {
+        const token = req.headers.authorization.split(' ')[1];
+        const payloadBase64 = token.split('.')[1];
+        if (payloadBase64) {
+          const decoded = JSON.parse(Buffer.from(payloadBase64, 'base64').toString('utf8'));
+          userId = decoded.sub || decoded.id || decoded.userId;
+        }
+      } catch {
+        // ignore parse error if malformed
+      }
+    }
+    userId = userId || 'anonymous-offline-client';
     return this.syncService.processPush(dto, userId);
   }
 
   @Get('pull')
   async pull(@Query() query: SyncPullQueryDto, @Req() req: any) {
-    const userId = req.user?.id || 'anonymous-offline-client';
+    let userId = req.user?.id;
+    if (!userId && req.headers?.authorization?.startsWith('Bearer ')) {
+      try {
+        const token = req.headers.authorization.split(' ')[1];
+        const payloadBase64 = token.split('.')[1];
+        if (payloadBase64) {
+          const decoded = JSON.parse(Buffer.from(payloadBase64, 'base64').toString('utf8'));
+          userId = decoded.sub || decoded.id || decoded.userId;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    userId = userId || 'anonymous-offline-client';
     return this.syncService.processPull(query, userId);
   }
 }

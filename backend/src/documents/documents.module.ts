@@ -1,14 +1,15 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
-import { BullModule } from '@nestjs/bull';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { memoryStorage } from 'multer';
 import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
 import { DocumentQualityService } from './quality/document-quality.service';
+import { PdfValidationService } from './pdf/pdf-validation.service';
 import { StorageModule } from '../storage/storage.module';
 import { AuditModule } from '../audit/audit.module';
-import { DOCUMENT_PROCESSING_QUEUE } from '../workers/queue.constants';
+import { QueueModule } from '../queue/queue.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
@@ -23,7 +24,7 @@ import { DOCUMENT_PROCESSING_QUEUE } from '../workers/queue.constants';
         },
         fileFilter: (req, file, cb) => {
           const allowedTypes = cfg
-            .get<string>('ALLOWED_MIME_TYPES', 'application/pdf,image/jpeg,image/png')
+            .get<string>('ALLOWED_MIME_TYPES', 'application/pdf,image/jpeg,image/png,image/jpg')
             .split(',');
           if (allowedTypes.includes(file.mimetype)) {
             cb(null, true);
@@ -33,12 +34,13 @@ import { DOCUMENT_PROCESSING_QUEUE } from '../workers/queue.constants';
         },
       }),
     }),
-    BullModule.registerQueue({ name: DOCUMENT_PROCESSING_QUEUE }),
     StorageModule,
     AuditModule,
+    UsersModule,
+    forwardRef(() => QueueModule),
   ],
   controllers: [DocumentsController],
-  providers: [DocumentsService, DocumentQualityService],
-  exports: [DocumentsService, DocumentQualityService],
+  providers: [DocumentsService, DocumentQualityService, PdfValidationService],
+  exports: [DocumentsService, DocumentQualityService, PdfValidationService],
 })
 export class DocumentsModule {}

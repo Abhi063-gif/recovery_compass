@@ -62,11 +62,11 @@ export const DashboardPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 flex items-center gap-2">
-            <span>Good Morning, {displayName}</span>
+            <span>{t('greetingMorning', 'Good Morning')}, {displayName}</span>
             <span>👋</span>
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            {hasPlan ? `Day ${currentDay} • Active Recovery Timeline` : 'Welcome to Recovery Compass'}
+            {hasPlan ? `${t('day', 'Day')} ${currentDay} • ${t('activeTimeline', 'Active Recovery Timeline')}` : 'Welcome to Recovery Compass'}
           </p>
         </div>
       </div>
@@ -78,9 +78,9 @@ export const DashboardPage: React.FC = () => {
             <FileText className="w-8 h-8 text-sky-600" />
           </div>
           <div>
-            <h2 className="font-bold text-slate-900 text-lg">No Recovery Plan Yet</h2>
+            <h2 className="font-bold text-slate-900 text-lg">{t('noPlanYet', 'No Recovery Plan Yet')}</h2>
             <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
-              Upload your discharge summary to generate your personalised recovery plan with medications, tasks, and follow-up schedules.
+              {t('uploadDischargeDesc', 'Upload your discharge summary to generate your personalised recovery plan.')}
             </p>
           </div>
           <Link
@@ -88,7 +88,7 @@ export const DashboardPage: React.FC = () => {
             className="inline-flex items-center gap-2 px-6 py-3 bg-sky-600 hover:bg-sky-700 text-white text-sm font-bold rounded-2xl transition shadow-sm"
           >
             <Upload className="w-4 h-4" />
-            Upload Discharge Summary
+            {t('startRecovery', 'Upload Discharge Summary')}
           </Link>
         </div>
       )}
@@ -149,7 +149,7 @@ export const DashboardPage: React.FC = () => {
               {nextFollowUp ? (
                 <div className="space-y-1">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full">
-                    Next Follow-up
+                    {t('nextFollowUp', 'Next Follow-up')}
                   </span>
                   <h3 className="font-bold text-sm text-slate-900">{formatFollowUpDate(nextFollowUp)}</h3>
                   <span className="text-xs text-slate-500 block">
@@ -161,7 +161,7 @@ export const DashboardPage: React.FC = () => {
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
                     Follow-ups
                   </span>
-                  <h3 className="font-bold text-sm text-slate-900">No upcoming appointments</h3>
+                  <h3 className="font-bold text-sm text-slate-900">{t('noAppointments', 'No upcoming appointments')}</h3>
                   <span className="text-xs text-slate-500 block">Check your plan for scheduled visits</span>
                 </div>
               )}
@@ -170,7 +170,7 @@ export const DashboardPage: React.FC = () => {
                 to="/follow-ups"
                 className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition flex items-center gap-1 shrink-0"
               >
-                <span>View All</span>
+                <span>{t('viewAll', 'View All')}</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </Link>
             </div>
@@ -187,7 +187,7 @@ export const DashboardPage: React.FC = () => {
 
             <div className="space-y-2.5">
               {todayTasks.length === 0 ? (
-                <p className="text-sm text-slate-400 text-center py-4">No tasks scheduled for today.</p>
+                <p className="text-sm text-slate-400 text-center py-4">{t('noTasksToday', 'No tasks scheduled for today.')}</p>
               ) : (
                 todayTasks.map((task) => {
                   const isCompleted = task.status === 'completed';
@@ -269,7 +269,7 @@ export const DashboardPage: React.FC = () => {
           </div>
           <div>
             <span className="font-bold text-xs sm:text-sm text-urgentRed-900 block">
-              Emergency / Urgent Help
+              {t('emergencyHelp', 'Emergency / Urgent Help')}
             </span>
             <span className="text-[11px] text-urgentRed-700">
               Get immediate assistance if you notice any serious or unexpected symptoms.
@@ -285,7 +285,7 @@ export const DashboardPage: React.FC = () => {
           }}
           className="px-4 py-2 bg-urgentRed-600 hover:bg-urgentRed-700 text-white rounded-xl text-xs font-bold shrink-0 transition shadow-sm inline-flex items-center justify-center"
         >
-          Call 108 Ambulance
+          {t('call108', 'Call 108 Ambulance')}
         </a>
       </div>
     </div>

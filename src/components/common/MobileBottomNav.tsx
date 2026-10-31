@@ -1,14 +1,26 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, Calendar, Pill, Activity, Award, Users, MoreHorizontal } from 'lucide-react';
+import { Home, Calendar, Pill, Activity, Users, MoreHorizontal } from 'lucide-react';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 export const MobileBottomNav: React.FC = () => {
+  const { isAuthenticated, user } = useAuthStore();
+
+  if (!isAuthenticated || !user) {
+    return null;
+  }
+
+  const userRole = user.role?.toUpperCase();
+  const isAshaOrAnm = userRole === 'ASHA' || userRole === 'ANM' || userRole === 'ADMIN';
+
   const navItems = [
-    { to: '/dashboard', label: 'Home', icon: Home },
-    { to: '/timeline', label: 'Timeline', icon: Calendar },
+    { to: '/dashboard', label: 'Today', icon: Home },
+    { to: '/timeline', label: 'Plan', icon: Calendar },
     { to: '/medications', label: 'Meds', icon: Pill },
-    { to: '/schemes', label: 'Schemes', icon: Award },
-    { to: '/asha', label: 'ASHA', icon: Users },
+    { to: '/symptoms/log', label: 'Symptoms', icon: Activity },
+    ...(isAshaOrAnm
+      ? [{ to: '/asha', label: 'Caseload', icon: Users }]
+      : [{ to: '/family', label: 'Family', icon: Users }]),
     { to: '/settings', label: 'More', icon: MoreHorizontal },
   ];
 

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { ConfigService } from '@nestjs/config';
+import { RedisHealthService } from '../queue/redis-health.service';
 
 export interface DependencyStatus {
   status: 'healthy' | 'degraded' | 'unhealthy';
@@ -22,23 +23,16 @@ export interface HealthStatus {
  * Health Service
  *
  * Checks the status of all dependencies:
- * - PostgreSQL / Prisma
- * - Redis (optional — checked via Bull queue ping)
- * - Gemini AI API (optional — checked for key presence only)
- *
- * The overall status is:
- * - healthy   → all critical deps pass
- * - degraded  → non-critical deps failing
- * - unhealthy → critical deps failing
- *
- * Critical deps: database
- * Non-critical: Redis, AI APIs
+ * - PostgreSQL / Prisma (critical)
+ * - Redis (monitored via RedisHealthService; degraded if unavailable with DB fallback active)
+ * - Gemini AI API
  */
 @Injectable()
 export class HealthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cfg: ConfigService,
+    private readonly redisHealth: RedisHealthService,
   ) {}
 
   async getReadinessStatus() {
@@ -53,14 +47,23 @@ export class HealthService {
   }
 
   async getDetailedStatus(): Promise<HealthStatus> {
-    const [db, gemini] = await Promise.all([
+    const [db, redisPing, gemini] = await Promise.all([
       this.checkDatabase(),
+      this.redisHealth.ping(),
       this.checkGeminiConfig(),
     ]);
 
+    const redisStatus: DependencyStatus = redisPing.healthy
+      ? { status: 'healthy', latencyMs: redisPing.latencyMs }
+      : {
+          status: 'degraded',
+          latencyMs: redisPing.latencyMs,
+          error: redisPing.error || 'Redis unreachable — database-backed processing runner active',
+        };
+
     const criticalOk = db.status === 'healthy';
     const overall: HealthStatus['status'] = criticalOk
-      ? gemini.status === 'healthy'
+      ? gemini.status === 'healthy' && redisStatus.status === 'healthy'
         ? 'healthy'
         : 'degraded'
       : 'unhealthy';
@@ -74,6 +77,7 @@ export class HealthService {
       environment: this.cfg.get<string>('NODE_ENV', 'development'),
       dependencies: {
         database: db,
+        redis: redisStatus,
         gemini: gemini,
       },
     };

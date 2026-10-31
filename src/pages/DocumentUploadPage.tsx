@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   UploadCloud,
@@ -6,30 +6,56 @@ import {
   Camera,
   CheckCircle2,
   ShieldCheck,
-  RotateCw,
-  Eye,
   Trash2,
   ArrowRight,
   Edit3,
   Lock,
   ChevronLeft,
   Loader2,
+  AlertCircle,
+  LogIn,
 } from 'lucide-react';
 import { usePlanStore } from '@/stores/usePlanStore';
+import { useAuthStore } from '@/stores/useAuthStore';
 import { documentsApi } from '@/api/documents';
 
 export const DocumentUploadPage: React.FC = () => {
   const navigate = useNavigate();
   const { uploadedFile, setUploadedFile } = usePlanStore();
+  const { isAuthenticated, user } = useAuthStore();
 
   const [isDragging, setIsDragging] = useState(false);
-  const [qualityState, setQualityState] = useState<'good' | 'blurry' | 'glare' | 'unreadable'>('good');
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [manualText, setManualText] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
+  // Authentication gate: Redirect unauthenticated visitors to login
+  useEffect(() => {
+    if (!isAuthenticated && !user) {
+      navigate('/login', {
+        replace: true,
+        state: {
+          from: '/documents/upload',
+          message: 'Please sign in or create an account to upload your discharge summary.',
+        },
+      });
+    }
+  }, [isAuthenticated, user, navigate]);
+
   const handleFileSelect = (fileOrName: File | string, sizeStr?: string) => {
+    if (!isAuthenticated && !user) {
+      setUploadError('Please sign in or create an account before uploading medical documents.');
+      navigate('/login', {
+        state: {
+          from: '/documents/upload',
+          message: 'Please sign in or create an account to upload your discharge summary.',
+        },
+      });
+      return;
+    }
+
+    setUploadError(null);
     if (typeof fileOrName === 'string') {
       const name = fileOrName;
       const size = sizeStr || '1.2 MB';
@@ -44,48 +70,111 @@ export const DocumentUploadPage: React.FC = () => {
       });
     } else {
       const file = fileOrName;
+      // ─── 0-Byte Validation Gate ─────────────────────────────────────────────
+      if (!file || file.size === 0) {
+        setUploadError('The selected file is empty (0 bytes). Please upload a valid document.');
+        setUploadedFile(null);
+        return;
+      }
       setUploadedFile({
         name: file.name,
-        size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+        size:
+          file.size < 1024 * 1024
+            ? `${(file.size / 1024).toFixed(1)} KB`
+            : `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
         type: file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
         url: URL.createObjectURL(file),
         fileObj: file,
       });
     }
-    setQualityState('good');
   };
 
   const handleStartProcessing = async () => {
+    if (!isAuthenticated && !user) {
+      setUploadError('Please sign in or create an account before uploading medical documents.');
+      navigate('/login', {
+        state: {
+          from: '/documents/upload',
+          message: 'Please sign in or create an account to upload your discharge summary.',
+        },
+      });
+      return;
+    }
+
+    const file = uploadedFile?.fileObj;
+    if (!file || file.size === 0) {
+      setUploadError('The selected file is empty (0 bytes). Please upload a valid document.');
+      return;
+    }
+
     setIsUploading(true);
     setUploadError(null);
 
-    const file = uploadedFile?.fileObj;
-    if (file) {
-      try {
-        const uploadRes = await documentsApi.upload(file);
-        const docId = uploadRes.id || uploadRes.documentId;
-        if (docId) {
-          usePlanStore.getState().uploadedFile = { ...uploadedFile, fileObj: file };
-          try {
-            await documentsApi.triggerProcessing(docId);
-          } catch (pErr) {
-            console.warn('Backend trigger processing skipped/deferred:', pErr);
-          }
-          navigate(`/documents/processing/${docId}`);
-          return;
+    try {
+      const uploadRes = await documentsApi.upload(file);
+      const docId = uploadRes.id || uploadRes.documentId;
+      if (docId) {
+        usePlanStore.getState().uploadedFile = { ...uploadedFile, fileObj: file };
+        try {
+          await documentsApi.triggerProcessing(docId);
+        } catch (pErr) {
+          console.warn('Backend trigger processing skipped/deferred:', pErr);
         }
-      } catch (err: any) {
-        console.warn('Backend document upload skipped or failed, using local/demo session:', err);
+        navigate(`/documents/processing/${docId}`);
+        return;
       }
+    } catch (err: any) {
+      console.warn('Backend document upload skipped or failed, using local/demo session:', err);
     }
 
     const localId = `doc-local-${Date.now()}`;
     navigate(`/documents/processing/${localId}`);
   };
 
+  // If unauthenticated, render the authentication barrier card
+  if (!isAuthenticated && !user) {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-16 text-center">
+        <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-elevated space-y-5">
+          <div className="w-14 h-14 rounded-2xl bg-rose-50 text-[#C8103E] flex items-center justify-center mx-auto">
+            <Lock className="w-7 h-7" />
+          </div>
+          <div className="space-y-1.5">
+            <h2 className="text-xl font-bold text-[#17243A]">Authentication Required</h2>
+            <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
+              Please sign in or create an account to upload your medical documents and link your recovery plan.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <button
+              onClick={() =>
+                navigate('/login', {
+                  state: {
+                    from: '/documents/upload',
+                    message: 'Please sign in or create an account to upload your discharge summary.',
+                  },
+                })
+              }
+              className="w-full sm:w-auto px-6 py-2.5 bg-[#C8103E] hover:bg-rose-800 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center justify-center gap-2"
+            >
+              <LogIn className="w-4 h-4" />
+              <span>Sign In or Register</span>
+            </button>
+            <button
+              onClick={() => navigate('/')}
+              className="w-full sm:w-auto px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition"
+            >
+              Return to Home
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-5xl mx-auto space-y-6 py-2">
-      {/* Header (Matching Wireframe 3) */}
+      {/* Header */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
           Upload your discharge instructions
@@ -95,7 +184,18 @@ export const DocumentUploadPage: React.FC = () => {
         </p>
       </div>
 
-      {/* 2-Column Layout (Matching Wireframe 3) */}
+      {/* Upload Error Banner */}
+      {uploadError && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-3 text-xs text-red-700 animate-in fade-in">
+          <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <span className="font-bold text-sm text-red-900 block">Invalid Document</span>
+            <p className="mt-0.5 font-medium">{uploadError}</p>
+          </div>
+        </div>
+      )}
+
+      {/* 2-Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Upload Zone */}
         <div className="lg:col-span-8 bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-card space-y-5">
@@ -183,7 +283,10 @@ export const DocumentUploadPage: React.FC = () => {
                 </div>
 
                 <button
-                  onClick={() => setUploadedFile(null)}
+                  onClick={() => {
+                    setUploadedFile(null);
+                    setUploadError(null);
+                  }}
                   className="p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition"
                   aria-label="Remove uploaded file"
                 >
@@ -215,10 +318,10 @@ export const DocumentUploadPage: React.FC = () => {
             </button>
 
             <button
-              disabled={!uploadedFile || isUploading}
+              disabled={!uploadedFile || isUploading || Boolean(uploadError)}
               onClick={handleStartProcessing}
               className={`px-6 py-2.5 rounded-xl font-bold text-xs transition flex items-center gap-2 ${
-                uploadedFile
+                uploadedFile && !uploadError
                   ? 'bg-rose-700 hover:bg-rose-800 text-white shadow-md'
                   : 'bg-slate-200 text-slate-400 cursor-not-allowed'
               }`}
@@ -230,7 +333,7 @@ export const DocumentUploadPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column: "Your privacy matters" (Matching Wireframe 3) */}
+        {/* Right Column: "Your privacy matters" */}
         <div className="lg:col-span-4 bg-white rounded-3xl p-6 border border-slate-200 shadow-card space-y-4">
           <div className="flex items-center gap-2">
             <Lock className="w-4 h-4 text-rose-700" />
@@ -283,11 +386,15 @@ export const DocumentUploadPage: React.FC = () => {
                 Cancel
               </button>
               <button
+                disabled={!manualText.trim()}
                 onClick={() => {
-                  handleFileSelect('Manual_Entered_Instructions.txt', '12 KB');
+                  if (!manualText.trim()) return;
+                  const blob = new Blob([manualText], { type: 'text/plain' });
+                  const file = new File([blob], 'Manual_Entered_Instructions.txt', { type: 'text/plain' });
+                  handleFileSelect(file);
                   setIsManualModalOpen(false);
                 }}
-                className="px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold rounded-xl"
+                className="px-4 py-2 bg-rose-700 hover:bg-rose-800 disabled:opacity-50 text-white text-xs font-bold rounded-xl"
               >
                 Use Text
               </button>

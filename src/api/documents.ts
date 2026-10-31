@@ -23,6 +23,12 @@ export interface DocumentResponse {
   qualityIssues?: string[];
   uploadedAt: string;
   extractionId?: string;
+  processingJob?: {
+    id: string;
+    status: string;
+    attempt: number;
+    lastError?: string | null;
+  } | null;
 }
 
 export interface DocumentQualityReport {
@@ -40,11 +46,15 @@ export const documentsApi = {
     return apiClient.get<DocumentResponse>(`/documents/${id}`);
   },
 
-  process: async (id: string): Promise<{ jobId: string; status: string }> => {
-    return apiClient.post<{ jobId: string; status: string }>(`/documents/${id}/process`);
+  getStatus: async (id: string): Promise<DocumentResponse> => {
+    return apiClient.get<DocumentResponse>(`/documents/${id}/status`);
   },
 
-  triggerProcessing: async (id: string): Promise<{ jobId: string; status: string }> => {
+  process: async (id: string): Promise<{ jobId: string; status: string; mode?: string }> => {
+    return apiClient.post<{ jobId: string; status: string; mode?: string }>(`/documents/${id}/process`);
+  },
+
+  triggerProcessing: async (id: string): Promise<{ jobId: string; status: string; mode?: string }> => {
     return documentsApi.process(id);
   },
 

@@ -20,11 +20,13 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianG
 import { useSymptomStore } from '@/stores/useSymptomStore';
 import { useSafetyStore } from '@/stores/useSafetyStore';
 import { usePlanStore } from '@/stores/usePlanStore';
+import { useTranslation } from '@/services/i18n';
 
 export const SymptomsPage: React.FC = () => {
   const { history, addLog, fetchHistory } = useSymptomStore();
   const { evaluateSafety } = useSafetyStore();
   const plan = usePlanStore((s) => s.plan);
+  const { t } = useTranslation();
 
   // Active pathway determination (defaults to 'POST_SURGERY')
   const detectedPathway = (plan?.patientProfile?.pathway || 'POST_SURGERY').toUpperCase();
@@ -203,16 +205,16 @@ export const SymptomsPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Log Your Symptoms & Vitals</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{t('symptomTracker', 'Log Your Symptoms & Vitals')}</h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Personalized recovery monitoring based on your active care pathway.
+            {t('symptomSubtitle', 'Personalized recovery monitoring based on your active care pathway.')}
           </p>
         </div>
 
         {justSaved && (
           <div className="px-3.5 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1.5 animate-in fade-in">
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>Check-in saved successfully!</span>
+            <span>{t('savedSuccess', 'Check-in saved successfully!')}</span>
           </div>
         )}
       </div>
@@ -531,7 +533,7 @@ export const SymptomsPage: React.FC = () => {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Pain Level
+                {t('painScore', 'Pain Level (1–10)')}
               </label>
               <span className="text-xs font-bold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
                 Score: {painLevel} / 10
@@ -567,7 +569,7 @@ export const SymptomsPage: React.FC = () => {
           {/* Symptom Multi-Select Chips */}
           <div className="space-y-2.5">
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-              Symptoms (select all that apply)
+              {t('selectSymptoms', 'Symptoms (select all that apply)')}
             </label>
             <div className="flex flex-wrap gap-2">
               {symptomOptions.map((sym) => {
@@ -601,7 +603,7 @@ export const SymptomsPage: React.FC = () => {
           {/* Temperature Input */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-              Temperature (optional, °F)
+              {t('temperature', 'Body Temperature (°F)')}
             </label>
             <div className="relative max-w-xs">
               <Thermometer className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
@@ -619,7 +621,7 @@ export const SymptomsPage: React.FC = () => {
           {/* Notes Input */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-              Additional Notes (optional)
+              {t('additionalNotes', 'Additional Notes (optional)')}
             </label>
             <input
               type="text"
@@ -659,7 +661,7 @@ export const SymptomsPage: React.FC = () => {
               type="submit"
               className="px-6 py-2.5 bg-rose-700 hover:bg-rose-800 text-white font-bold text-xs rounded-xl shadow-md transition hover:-translate-y-0.5"
             >
-              Save Check-in
+              {t('saveSymptomLog', 'Save Daily Check-in')}
             </button>
           </div>
         </form>
@@ -670,7 +672,7 @@ export const SymptomsPage: React.FC = () => {
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-card space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <h3 className="font-bold text-sm text-slate-900">
-                Recent Symptom Logs
+                {t('symptoms', 'Recent Symptom Logs')}
               </h3>
               <span className="text-[11px] font-semibold text-slate-400">
                 {history.length} recorded
@@ -680,7 +682,7 @@ export const SymptomsPage: React.FC = () => {
             {history.length === 0 ? (
               <div className="py-8 text-center text-slate-500">
                 <CheckCircle2 className="w-8 h-8 mx-auto text-emerald-600 mb-2" />
-                <p className="text-xs font-bold text-slate-800">No logs yet</p>
+                <p className="text-xs font-bold text-slate-800">{t('noLogsYet', 'No logs yet')}</p>
                 <p className="text-[11px] text-slate-500 mt-0.5">
                   Your daily recovery check-ins will appear here.
                 </p>

@@ -138,7 +138,7 @@ export const TimelinePage: React.FC = () => {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{t('timeline')}</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Day-by-day guidance based on your verified discharge instructions.
+            {t('medicationSubtitle', 'Day-by-day guidance based on your verified discharge instructions.')}
           </p>
         </div>
       </div>
@@ -150,9 +150,9 @@ export const TimelinePage: React.FC = () => {
             <FileText className="w-8 h-8 text-sky-600" />
           </div>
           <div>
-            <h2 className="font-bold text-slate-900 text-lg">No Recovery Plan Yet</h2>
+            <h2 className="font-bold text-slate-900 text-lg">{t('noPlanYet', 'No Recovery Plan Yet')}</h2>
             <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
-              Upload your discharge summary to generate your personalised 15-day recovery timeline.
+              {t('uploadDischargeDesc', 'Upload your discharge summary to generate your personalised 15-day recovery timeline.')}
             </p>
           </div>
           <Link
@@ -160,7 +160,7 @@ export const TimelinePage: React.FC = () => {
             className="inline-flex items-center gap-2 px-6 py-3 bg-sky-600 hover:bg-sky-700 text-white text-sm font-bold rounded-2xl transition shadow-sm"
           >
             <Upload className="w-4 h-4" />
-            Upload Discharge Summary
+            {t('startRecovery', 'Upload Discharge Summary')}
           </Link>
         </div>
       )}
@@ -262,12 +262,12 @@ export const TimelinePage: React.FC = () => {
                           ? 'bg-emerald-100 text-emerald-800'
                           : 'bg-sky-100 text-sky-800'
                       }`}>
-                        {med.todayStatus === 'taken' ? 'Taken' : 'Pending'}
+                        {med.todayStatus === 'taken' ? t('taken', 'Taken') : t('pending', 'Pending')}
                       </span>
                     </div>
                   ))}
                   <Link to="/medications" className="text-[11px] text-sky-600 font-semibold pl-2 hover:underline">
-                    View all medications →
+                    {t('viewAll', 'View all')} {t('medications', 'medications')} →
                   </Link>
                 </div>
               )}

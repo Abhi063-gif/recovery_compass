@@ -76,7 +76,7 @@ class OfflineStorageEngine {
       const db = await this.getDb();
       const tx = db.transaction('outbox', 'readwrite');
       tx.objectStore('outbox').put(mutation);
-    } catch (err) {
+    } catch {
       // Fallback to localStorage if IndexedDB is blocked
       const queue = JSON.parse(localStorage.getItem('rc_offline_outbox') || '[]');
       queue.push(mutation);
@@ -106,9 +106,30 @@ class OfflineStorageEngine {
       const tx = db.transaction('outbox', 'readwrite');
       tx.objectStore('outbox').delete(id);
     } catch {
+      // ignore
+    }
+    try {
       const queue = JSON.parse(localStorage.getItem('rc_offline_outbox') || '[]');
       const filtered = queue.filter((m: any) => m.id !== id);
       localStorage.setItem('rc_offline_outbox', JSON.stringify(filtered));
+    } catch {
+      // ignore
+    }
+  }
+
+  // Clear all mutations
+  async clearOutbox(): Promise<void> {
+    try {
+      const db = await this.getDb();
+      const tx = db.transaction('outbox', 'readwrite');
+      tx.objectStore('outbox').clear();
+    } catch {
+      // ignore
+    }
+    try {
+      localStorage.removeItem('rc_offline_outbox');
+    } catch {
+      // ignore
     }
   }
 
@@ -165,7 +186,10 @@ class OfflineStorageEngine {
 
     const metaEnv = (import.meta as { env?: Record<string, string> }).env;
     const baseUrl = (metaEnv?.VITE_API_BASE_URL || 'http://localhost:3000/api/v1').replace(/\/$/, '');
-    const token = localStorage.getItem('recovery_compass_access_token');
+    const token =
+      localStorage.getItem('recovery_compass_access_token') ||
+      localStorage.getItem('auth_token');
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -185,11 +209,22 @@ class OfflineStorageEngine {
       });
 
       if (response.ok) {
-        // Clear synced mutations
-        for (const m of mutations) {
-          await this.clearMutation(m.id);
+        const result = await response.json().catch(() => ({}));
+        const failedIds = new Set<string>();
+        if (Array.isArray(result?.errors)) {
+          for (const errStr of result.errors) {
+            const id = errStr.split(':')[0]?.trim();
+            if (id) failedIds.add(id);
+          }
         }
-        return { success: true, syncedCount: mutations.length };
+
+        // Remove successfully processed mutations from IndexedDB / local storage
+        for (const m of mutations) {
+          if (!failedIds.has(m.id)) {
+            await this.clearMutation(m.id);
+          }
+        }
+        return { success: true, syncedCount: result?.processed ?? mutations.length };
       }
     } catch (e) {
       console.warn('Sync outbox push failed (offline):', e);

@@ -13,7 +13,9 @@ import {
   Sparkles,
   RefreshCw,
   Search,
+  Building2,
 } from 'lucide-react';
+import { useTranslation } from '@/services/i18n';
 
 interface SchemeRule {
   id: string;
@@ -32,427 +34,423 @@ interface SchemeRule {
 
 interface QuestionnaireState {
   state: string;
-  rationCategory: string; // 'BPL' | 'AAY' | 'APL_ORANGE' | 'WHITE' | 'NONE'
+  rationCategory: string; // 'BPL' | 'AAY' | 'BLUE_CARD_PUNJAB' | 'GENERAL'
   pathway: string;
   isPregnantOrPostnatal: boolean;
   age: number;
 }
 
-const SCHEMES: SchemeRule[] = [
+const AUTHENTIC_INDIAN_SCHEMES: SchemeRule[] = [
   {
     id: 'pmjay',
     name: 'Ayushman Bharat PM-JAY',
-    nameRegional: 'आयुष्मान भारत प्रधानमंत्री जन आरोग्य योजना',
+    nameRegional: 'ਆਯੁਸ਼ਮਾਨ ਭਾਰਤ ਪ੍ਰਧਾਨ ਮੰਤਰੀ ਜਨ ਅਰੋਗਿਆ ਯੋਜਨਾ / आयुष्मान भारत',
     category: 'national',
     coverageAmount: 'Up to ₹5,00,000 / family / year',
     summary: 'Secondary & tertiary hospitalization coverage in empanelled public and private hospitals across India.',
-    details: 'Covers pre-hospitalization (3 days), hospitalization, ICU, surgery, diagnostics, and 15 days post-discharge medications.',
+    details: 'Covers pre-hospitalization (3 days), surgical procedures, ICU, diagnostic tests, and 15 days post-discharge medications.',
     helpline: '14555 / 1800 111 565',
     officialPortal: 'https://pmjay.gov.in',
     documentsRequired: [
       'Aadhaar Card (identity proof)',
-      'Ration Card (NFSA / BPL / Antyodaya)',
-      'Ayushman Golden Card (if already issued)',
-      'Discharge Summary & Prescription',
+      'Ration Card / NFSA / Antyodaya Card',
+      'Ayushman Card (PM-JAY Golden Card)',
+      'Hospital Discharge Summary & Treatment Slips',
     ],
     eligibilityCheck: (a) => {
-      if (['BPL', 'AAY', 'APL_ORANGE'].includes(a.rationCategory)) return 'likely';
-      if (a.rationCategory === 'WHITE') return 'maybe';
+      if (['BPL', 'AAY', 'BLUE_CARD_PUNJAB'].includes(a.rationCategory)) return 'likely';
       return 'maybe';
     },
-    notes: 'Free treatment for secondary and surgical care. Check with the Ayushman Mitra desk at your Taluka/District hospital.',
+    notes: 'Free cashless treatment for surgical care. Check with the Ayushman Mitra desk at your Civil Hospital or empanelled facility.',
   },
   {
-    id: 'mjpjay',
-    name: 'Mahatma Jyotirao Phule Jan Arogya Yojana (MJPJAY)',
-    nameRegional: 'महात्मा ज्योतिराव फुले जन आरोग्य योजना (महाराष्ट्र शासन)',
+    id: 'ab-mmjby',
+    name: 'Ayushman Bharat Mukh Mantri Sehat Bima Yojana (AB-MMJBY) — Punjab',
+    nameRegional: 'ਮੁੱਖ ਮੰਤਰੀ ਸਿਹਤ ਬੀਮਾ ਯੋਜਨਾ (ਪੰਜਾਬ ਸਰਕਾਰ)',
     category: 'state',
     coverageAmount: 'Up to ₹5,00,000 / family / year',
-    summary: 'Maharashtra State health assurance scheme for state residents, covering 1,356 medical and surgical procedures.',
-    details: 'Applicable in Maharashtra empanelled government and trust/private hospitals. Covers post-operative follow-up and medicine package.',
-    helpline: '155388 / 1800 233 2200',
-    officialPortal: 'https://www.jeevandayee.gov.in',
+    summary: 'Punjab State flagship health assurance scheme covering more than 65% of the state population (over 44 lakh families).',
+    details: 'Provides cashless treatment across 900+ empanelled government and private hospitals in Punjab. Covers post-operative medicines and diagnostic packages.',
+    helpline: '104 (Punjab Health Helpline) / 14555',
+    officialPortal: 'https://sha.punjab.gov.in',
     documentsRequired: [
-      'Yellow or Orange Ration Card (Maharashtra)',
-      'Aadhaar Card or Voter ID of patient',
-      'Doctor referral note or hospital admission slip',
-      'Passport size photo',
+      'Aadhaar Card with Punjab residence',
+      'Punjab Blue Ration Card (NFSA) / J-Form (Farmers) / Sugarcane weight slip / Excise card',
+      'Doctor prescription / discharge slip from Government Hospital',
+      'Passport size photograph',
     ],
     eligibilityCheck: (a) => {
-      if (a.state.toLowerCase().includes('maha') && ['BPL', 'AAY', 'APL_ORANGE'].includes(a.rationCategory)) return 'likely';
-      if (a.state.toLowerCase().includes('maha')) return 'maybe';
+      if (a.state.toLowerCase().includes('punjab') && ['BPL', 'AAY', 'BLUE_CARD_PUNJAB'].includes(a.rationCategory)) return 'likely';
+      if (a.state.toLowerCase().includes('punjab')) return 'likely';
+      return 'maybe';
+    },
+    notes: 'Empanelled across all Civil Hospitals and Sub-Divisional Hospitals in Punjab. Zero out-of-pocket hospitalisation cost.',
+  },
+  {
+    id: 'jssk',
+    name: 'Janani Shishu Suraksha Karyakram (JSSK)',
+    nameRegional: 'ਜਨਨੀ ਸ਼ਿਸ਼ੂ ਸੁਰੱਖਿਆ ਕਾਰਜਕ੍ਰਮ (ਪੂਰੀ ਤਰ੍ਹਾਂ ਮੁਫਤ ਜਣੇਪਾ ਸੇਵਾਵਾਂ)',
+    category: 'maternal',
+    coverageAmount: '100% Free Treatment, Medicines & Transport',
+    summary: 'Universal zero-expense delivery entitlement for pregnant women and sick neonates up to 30 days post-birth in public health facilities.',
+    details: 'Covers completely free Normal & Caesarean deliveries, zero-cost drugs and consumables, free diagnostics, free diet during stay, and free 108 ambulance transport.',
+    helpline: '108 (Free Drop-back Ambulance) / 104',
+    officialPortal: 'https://nhm.gov.in',
+    documentsRequired: [
+      'Mother and Child Protection (MCP) Card registered with ASHA/ANM',
+      'Aadhaar Card of mother',
+      'Institutional Delivery / Hospital Admission Slip',
+    ],
+    eligibilityCheck: (a) => {
+      if (a.isPregnantOrPostnatal || a.pathway === 'PREGNANCY') return 'likely';
       return 'ineligible';
     },
-    notes: 'Universalized scheme in Maharashtra. Yellow and Orange ration card holders have zero out-of-pocket costs at empanelled centres.',
+    notes: 'No out-of-pocket expenses allowed in Government Civil Hospitals, CHCs, or PHCs. Includes free home drop-back in 108 ambulance.',
   },
   {
     id: 'pmmvy',
     name: 'Pradhan Mantri Matru Vandana Yojana (PMMVY)',
-    nameRegional: 'प्रधानमंत्री मातृ वंदना योजना (मातृत्व लाभ)',
+    nameRegional: 'ਪ੍ਰਧਾਨ ਮੰਤਰੀ ਮਾਤਰੂ ਵੰਦਨਾ ਯੋਜਨਾ (ਮਾਤ੍ਰਤਵ ਲਾਭ)',
     category: 'maternal',
-    coverageAmount: '₹5,000 in Direct Cash Transfer',
-    summary: 'Maternity benefit cash incentive directly deposited into Aadhaar-linked bank account in installments.',
-    details: 'Supports nutritional needs and compensates wage loss during pregnancy and post-delivery lactation.',
-    helpline: '011-23382393 / 104',
+    coverageAmount: '₹5,000 to ₹6,000 Direct Benefit Transfer (DBT)',
+    summary: 'Maternity financial incentive credited directly into Aadhaar-linked bank accounts in installments.',
+    details: 'Compensates wage loss and promotes institutional delivery and early infant immunization.',
+    helpline: '104 / 011-23382393',
     officialPortal: 'https://pmmvy.wcd.gov.in',
     documentsRequired: [
-      'Mother and Father Aadhaar Cards',
-      'Mother-Child Protection (MCP) Card registered with ASHA/ANM',
-      'Aadhaar-seeded Bank Passbook copy',
-      'Delivery/Discharge certificate from health facility',
+      'MCP Card registered at Sub-Centre / Anganwadi',
+      'Mother and Father Aadhaar Card',
+      'Aadhaar-seeded Bank Passbook',
+      'Child Birth Registration Certificate',
     ],
     eligibilityCheck: (a) => {
       if (a.isPregnantOrPostnatal || a.pathway === 'PREGNANCY') return 'likely';
       return 'ineligible';
     },
-    notes: 'Register through your local ASHA worker or Anganwadi centre within 270 days of delivery.',
+    notes: 'Register via your local ASHA worker or Anganwadi centre in your village block.',
   },
   {
-    id: 'jsy',
-    name: 'Janani Suraksha Yojana (JSY)',
-    nameRegional: 'जननी सुरक्षा योजना (संस्थात्मक प्रसूती सहाय्य)',
-    category: 'maternal',
-    coverageAmount: '₹1,400 Cash Assistance (Rural)',
-    summary: 'Safe motherhood intervention promoting institutional delivery in rural public health facilities.',
-    details: 'Paid immediately at discharge from Sub-District Hospital, Rural Hospital, or Primary Health Centre.',
-    helpline: '104 (Health Helpline)',
-    officialPortal: 'https://nhm.gov.in',
+    id: 'rbsk',
+    name: 'Rashtriya Bal Swasthya Karyakram (RBSK) — Punjab',
+    nameRegional: 'ਰਾਸ਼ਟਰੀ ਬਾਲ ਸਵਾਸਥ ਪ੍ਰੋਗਰਾਮ (ਬੱਚਿਆਂ ਲਈ ਮੁਫਤ ਸਰਜਰੀ ਅਤੇ ਇਲਾਜ)',
+    category: 'disease',
+    coverageAmount: '100% Free Screening & Tertiary Care',
+    summary: 'Child health screening and early intervention covering 4Ds (Defects at birth, Diseases, Deficiencies, Development delays) from birth to 18 years.',
+    details: 'Free corrective surgeries for Congenital Heart Disease (CHD), Cleft Lip/Palate, Clubfoot, and neural tube defects at empanelled tertiary hospitals (e.g. PGIMER Chandigarh).',
+    helpline: '104 (Punjab Health Helpline)',
+    officialPortal: 'https://nhm.punjab.gov.in',
     documentsRequired: [
-      'MCP Card (Mother-Child Protection Card)',
-      'BPL / SC / ST Certificate (if applicable)',
-      'Institutional Delivery Discharge Slip',
-      'Bank details for DBT transfer',
+      'RBSK Mobile Health Team Screening Slip / School Health Card',
+      'Child Birth Certificate or Aadhaar Card',
+      'Parent Aadhaar Card',
     ],
     eligibilityCheck: (a) => {
-      if (a.isPregnantOrPostnatal || a.pathway === 'PREGNANCY') return 'likely';
+      if (a.age <= 18) return 'likely';
       return 'ineligible';
     },
-    notes: 'ASHA worker receives accompanying incentive; patient receives direct financial assistance at discharge.',
+    notes: 'Screening conducted by dedicated RBSK Mobile Medical Teams at Anganwadi Centres and Government Schools across Punjab.',
+  },
+  {
+    id: 'punjab-free-meds',
+    name: 'Punjab Free Essential Drugs & Diagnostics (Aam Aadmi Clinics)',
+    nameRegional: 'ਮੁਫਤ ਦਵਾਈਆਂ ਅਤੇ ਲੈਬ ਟੈਸਟ ਸਕੀਮ (ਆਮ ਆਦਮੀ ਕਲੀਨਿਕ ਅਤੇ ਪੀ.ਐਚ.ਸੀ)',
+    category: 'state',
+    coverageAmount: '100% Free Drugs & 40+ Diagnostic Tests',
+    summary: 'Free essential medicines and pathology diagnostics across 650+ Aam Aadmi Clinics, PHCs, and Civil Hospitals in Punjab.',
+    details: 'Provides free blood tests, sugar tests, ECG, post-op wound dressings, and over 100 free generic pharmaceuticals for surgery and chronic illness patients.',
+    helpline: '104 (Health Helpline)',
+    officialPortal: 'https://punjab.gov.in',
+    documentsRequired: [
+      'Doctor Prescription Slip from PHC or Civil Hospital',
+      'Aadhaar Card or Phone Number for OPD token',
+    ],
+    eligibilityCheck: () => 'likely',
+    notes: 'Universal entitlement for all residents of Punjab visiting public health facilities. No ration card required.',
   },
   {
     id: 'nikshay',
-    name: 'Nikshay Poshan Yojana (TB Nutrition Support)',
-    nameRegional: 'निक्षय पोषण योजना (टीबी पोषण सहाय्य)',
+    name: 'Nikshay Poshan Yojana (TB Nutritional Support DBT)',
+    nameRegional: 'ਨਿਕਸ਼ੈ ਪੋਸ਼ਣ ਯੋਜਨਾ (ਟੀ.ਬੀ. ਮਰੀਜ਼ ਪੋਸ਼ਣ ਸਹਾਇਤਾ)',
     category: 'disease',
-    coverageAmount: '₹500 / month throughout treatment',
-    summary: 'Direct Benefit Transfer (DBT) scheme providing financial incentive for nutritional support to tuberculosis patients.',
-    details: 'Provided monthly for the entire duration of DOTS anti-tubercular medication regimen (typically 6 months).',
+    coverageAmount: '₹500 / month direct cash transfer',
+    summary: 'Direct cash assistance credited monthly into patient accounts for nutritional support during anti-tubercular medication.',
+    details: 'Paid every month during the entire DOTS treatment regimen (typically 6 to 9 months) to prevent treatment defaults and support recovery.',
     helpline: '1800-11-6666 (Nikshay Helpline)',
     officialPortal: 'https://nikshay.in',
     documentsRequired: [
-      'Nikshay Patient ID (issued by PHC/DOTS centre)',
-      'Aadhaar Card',
+      'Nikshay ID issued by PHC / Civil Hospital DOTS Centre',
+      'Patient Aadhaar Card',
       'Active Bank Account Passbook (Aadhaar linked)',
-      'DOTS Treatment Card / Discharge Note',
     ],
     eligibilityCheck: (a) => {
       if (a.pathway === 'TUBERCULOSIS') return 'likely';
       return 'ineligible';
     },
-    notes: 'Enrolment done directly at your Primary Health Centre or by the TB Health Visitor (TBHV).',
+    notes: 'Enrolment completed automatically by the TB Health Visitor or ASHA worker at the time of diagnosis.',
   },
 ];
 
 export const SchemesPage: React.FC = () => {
+  const { t } = useTranslation();
   const [answers, setAnswers] = useState<QuestionnaireState>({
-    state: 'Maharashtra',
-    rationCategory: 'APL_ORANGE',
+    state: 'Punjab',
+    rationCategory: 'BLUE_CARD_PUNJAB',
     pathway: 'POST_SURGERY',
     isPregnantOrPostnatal: false,
     age: 48,
   });
 
-  const [hasEvaluated, setHasEvaluated] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedScheme, setSelectedScheme] = useState<SchemeRule | null>(null);
 
-  const eligibleSchemes = SCHEMES.filter(
+  const eligibleSchemes = AUTHENTIC_INDIAN_SCHEMES.filter(
     (s) => s.eligibilityCheck(answers) === 'likely'
   );
-  const maybeSchemes = SCHEMES.filter(
+  const maybeSchemes = AUTHENTIC_INDIAN_SCHEMES.filter(
     (s) => s.eligibilityCheck(answers) === 'maybe'
   );
+
+  const displayedSchemes = AUTHENTIC_INDIAN_SCHEMES.filter((s) => {
+    if (selectedCategory !== 'ALL' && s.category !== selectedCategory) return false;
+    if (searchQuery.trim() === '') return true;
+    return (
+      s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.nameRegional.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.summary.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  });
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto py-2">
       {/* Header */}
-      <div className="bg-gradient-to-r from-emerald-800 to-teal-700 text-white rounded-3xl p-6 sm:p-8 shadow-card relative overflow-hidden">
-        <div className="relative z-10 max-w-2xl space-y-2">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-700/60 text-emerald-100 text-[11px] font-semibold tracking-wide uppercase border border-emerald-500/30">
-            <Award className="w-3.5 h-3.5 text-amber-300" />
-            <span>Govt Schemes & Hospital Benefits</span>
+      <div className="bg-navy-900 text-white rounded-2xl p-6 sm:p-8 shadow-card border border-navy-700 relative overflow-hidden">
+        <div className="relative z-10 max-w-3xl space-y-3">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-navy-800 text-emerald-400 text-xs font-semibold tracking-wide border border-navy-600">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>National & Punjab State Health Schemes</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-            Government Scheme Eligibility Checker
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+            Government Health & Recovery Financial Schemes
           </h1>
-          <p className="text-xs sm:text-sm text-emerald-100/90 leading-relaxed">
-            Free healthcare and cash support schemes available for rural patients in Maharashtra and across India. 100% offline rule-based evaluation.
+          <p className="text-sm text-slate-300 leading-relaxed">
+            Verify your family's eligibility for cashless surgical care under Ayushman Bharat PM-JAY, Punjab Mukh Mantri Sehat Bima Yojana (AB-MMJBY), free maternity benefits (JSSK, PMMVY), and free essential medicines.
           </p>
+          <div className="pt-2 flex flex-wrap gap-2 text-xs">
+            <span className="bg-navy-800 px-3 py-1.5 rounded-lg border border-navy-700 text-slate-200">
+              National Helpline: <strong className="text-white">14555</strong>
+            </span>
+            <span className="bg-navy-800 px-3 py-1.5 rounded-lg border border-navy-700 text-slate-200">
+              Punjab Health Helpline: <strong className="text-white">104</strong>
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Guided Questionnaire */}
-      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-card space-y-5">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-          <div>
-            <h2 className="text-base font-bold text-slate-900">Your Eligibility Profile</h2>
-            <p className="text-xs text-slate-500">Answer 4 quick questions to see all applicable schemes</p>
+      {/* Quick Eligibility Evaluator Card */}
+      <div className="rc-card p-5 space-y-4">
+        <div className="flex items-center justify-between border-b border-surface-border pb-3">
+          <div className="flex items-center gap-2">
+            <Award className="w-5 h-5 text-brand-red" />
+            <h2 className="text-base font-semibold text-navy-900">Patient Eligibility Questionnaire</h2>
           </div>
-          <button
-            onClick={() => setHasEvaluated(true)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            Check Eligibility
-          </button>
+          <span className="text-xs text-content-secondary">Auto-matched with patient recovery profile</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
           {/* State */}
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-              State of Residence
-            </label>
+          <div className="space-y-1">
+            <label className="font-semibold text-navy-900">State of Residence</label>
             <select
               value={answers.state}
               onChange={(e) => setAnswers({ ...answers, state: e.target.value })}
-              className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full p-2 bg-slate-50 border border-surface-border rounded-lg text-navy-900 focus:outline-none focus:border-brand-red"
             >
-              <option value="Maharashtra">Maharashtra</option>
-              <option value="Other">Other States</option>
+              <option value="Punjab">Punjab</option>
+              <option value="Haryana">Haryana</option>
+              <option value="Chandigarh">Chandigarh (UT)</option>
+              <option value="Other">Other State</option>
             </select>
           </div>
 
-          {/* Ration Card */}
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-              Ration Card Category
-            </label>
+          {/* Ration / Beneficiary Card */}
+          <div className="space-y-1">
+            <label className="font-semibold text-navy-900">Beneficiary / Ration Card</label>
             <select
               value={answers.rationCategory}
               onChange={(e) => setAnswers({ ...answers, rationCategory: e.target.value })}
-              className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full p-2 bg-slate-50 border border-surface-border rounded-lg text-navy-900 focus:outline-none focus:border-brand-red"
             >
-              <option value="BPL">Yellow / BPL (Below Poverty Line)</option>
-              <option value="AAY">Antyodaya Anna Yojana (AAY)</option>
-              <option value="APL_ORANGE">Orange / Kesari Card (Maharashtra)</option>
-              <option value="WHITE">White Card / General</option>
+              <option value="BLUE_CARD_PUNJAB">Punjab Blue Ration Card (Atta-Dal)</option>
+              <option value="BPL">BPL / Antyodaya (AAY)</option>
+              <option value="GENERAL">General / Standard Card</option>
             </select>
           </div>
 
-          {/* Pathway / Condition */}
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-              Clinical Condition
-            </label>
+          {/* Clinical Pathway */}
+          <div className="space-y-1">
+            <label className="font-semibold text-navy-900">Care Pathway</label>
             <select
               value={answers.pathway}
-              onChange={(e) =>
-                setAnswers({
-                  ...answers,
-                  pathway: e.target.value,
-                  isPregnantOrPostnatal: e.target.value === 'PREGNANCY',
-                })
-              }
-              className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              onChange={(e) => setAnswers({ ...answers, pathway: e.target.value })}
+              className="w-full p-2 bg-slate-50 border border-surface-border rounded-lg text-navy-900 focus:outline-none focus:border-brand-red"
             >
-              <option value="POST_SURGERY">Post-Surgery Recovery</option>
-              <option value="PREGNANCY">Pregnancy / Postnatal</option>
-              <option value="DIABETES">Diabetes Care</option>
+              <option value="POST_SURGERY">Post-Surgical Recovery</option>
+              <option value="PREGNANCY">Maternal / Postnatal</option>
+              <option value="DIABETES">Diabetes & Hypertension</option>
               <option value="TUBERCULOSIS">Tuberculosis (DOTS)</option>
-              <option value="HYPERTENSION">Hypertension / Cardiac</option>
             </select>
           </div>
 
-          {/* Pregnancy Check */}
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-              Pregnant / Delivered in last year?
-            </label>
+          {/* Pregnant or Postnatal */}
+          <div className="space-y-1">
+            <label className="font-semibold text-navy-900">Maternity Condition</label>
             <select
               value={answers.isPregnantOrPostnatal ? 'yes' : 'no'}
-              onChange={(e) =>
-                setAnswers({ ...answers, isPregnantOrPostnatal: e.target.value === 'yes' })
-              }
-              className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              onChange={(e) => setAnswers({ ...answers, isPregnantOrPostnatal: e.target.value === 'yes' })}
+              className="w-full p-2 bg-slate-50 border border-surface-border rounded-lg text-navy-900 focus:outline-none focus:border-brand-red"
             >
-              <option value="no">No</option>
-              <option value="yes">Yes (Eligible for maternal benefits)</option>
+              <option value="no">General Surgical / Chronic</option>
+              <option value="yes">Pregnant or Post-Delivery (&lt; 1 yr)</option>
             </select>
           </div>
         </div>
+
+        {/* Results Banner */}
+        <div className="bg-clinical-green-bg border border-emerald-200 rounded-xl p-3 flex items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-clinical-green flex-shrink-0" />
+            <span className="text-emerald-900 font-medium">
+              Based on your profile, you are <strong>likely eligible for {eligibleSchemes.length} Government Health Schemes</strong> with zero out-of-pocket costs.
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* Results Section */}
-      {hasEvaluated && (
-        <div className="space-y-6">
-          {/* Likely Eligible Schemes */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-              <h2 className="text-base font-bold text-slate-900">
-                Highly Likely to Be Eligible ({eligibleSchemes.length})
-              </h2>
-            </div>
+      {/* Category Filter & Search */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+          {[
+            { label: 'All Schemes', value: 'ALL' },
+            { label: 'Punjab State Schemes', value: 'state' },
+            { label: 'National Schemes', value: 'national' },
+            { label: 'Maternal & Child', value: 'maternal' },
+            { label: 'Specific Illness', value: 'disease' },
+          ].map((cat) => (
+            <button
+              key={cat.value}
+              onClick={() => setSelectedCategory(cat.value)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg whitespace-nowrap transition-colors ${
+                selectedCategory === cat.value
+                  ? 'bg-navy-900 text-white shadow-sm'
+                  : 'bg-white border border-surface-border text-navy-800 hover:bg-slate-50'
+              }`}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {eligibleSchemes.map((scheme) => (
-                <div
-                  key={scheme.id}
-                  className="bg-white rounded-3xl p-6 border-2 border-emerald-300 shadow-card hover:border-emerald-500 transition cursor-pointer flex flex-col justify-between space-y-4"
-                  onClick={() => setSelectedScheme(scheme)}
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                        Likely Eligible
-                      </span>
-                      <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg">
-                        {scheme.coverageAmount}
-                      </span>
-                    </div>
+        <div className="relative w-full sm:w-64">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" />
+          <input
+            type="text"
+            placeholder="Search scheme name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-surface-border rounded-input focus:outline-none focus:border-brand-red placeholder:text-content-muted"
+          />
+        </div>
+      </div>
 
-                    <h3 className="font-bold text-slate-900 text-base">{scheme.name}</h3>
-                    <p className="text-[11px] text-slate-500 font-medium">{scheme.nameRegional}</p>
-                    <p className="text-xs text-slate-600 line-clamp-2">{scheme.summary}</p>
-                  </div>
-
-                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                    <span className="text-slate-400 font-medium flex items-center gap-1">
-                      <Phone className="w-3.5 h-3.5 text-slate-400" />
-                      {scheme.helpline.split('/')[0]}
+      {/* Schemes List */}
+      <div className="space-y-3">
+        {displayedSchemes.map((scheme) => {
+          const status = scheme.eligibilityCheck(answers);
+          return (
+            <div
+              key={scheme.id}
+              className="rc-card p-5 hover:border-slate-300 transition-all duration-150 space-y-3"
+            >
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                        scheme.category === 'state'
+                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                          : scheme.category === 'national'
+                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                          : scheme.category === 'maternal'
+                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                          : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      }`}
+                    >
+                      {scheme.category === 'state' ? 'Punjab State Scheme' : scheme.category.toUpperCase()}
                     </span>
-                    <button className="text-emerald-700 font-bold flex items-center gap-1 hover:underline">
-                      View Documents & Guide <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
+                    <span
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
+                        status === 'likely'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          : status === 'maybe'
+                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {status === 'likely' ? 'Likely Eligible' : status === 'maybe' ? 'Check Required' : 'Not Applicable'}
+                    </span>
+                  </div>
+                  <h3 className="text-base font-semibold text-navy-900 pt-1">
+                    {scheme.name}
+                  </h3>
+                  <div className="text-xs text-content-secondary font-medium">
+                    {scheme.nameRegional}
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
 
-          {/* Maybe Eligible Schemes */}
-          {maybeSchemes.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
-                <h2 className="text-base font-bold text-slate-900">
-                  May Be Eligible / Check at PHC ({maybeSchemes.length})
-                </h2>
+                <div className="text-left sm:text-right flex-shrink-0">
+                  <div className="text-xs text-content-muted">Financial Benefit</div>
+                  <div className="text-sm font-bold text-clinical-green">{scheme.coverageAmount}</div>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {maybeSchemes.map((scheme) => (
-                  <div
-                    key={scheme.id}
-                    className="bg-white rounded-3xl p-6 border border-slate-200 shadow-card hover:border-amber-400 transition cursor-pointer flex flex-col justify-between space-y-4"
-                    onClick={() => setSelectedScheme(scheme)}
+              <p className="text-xs text-navy-800 leading-relaxed">
+                {scheme.summary}
+              </p>
+
+              {/* Collapsible Details or Structured Badges */}
+              <div className="bg-surface-subtle p-3 rounded-xl border border-slate-100 space-y-2 text-xs">
+                <div>
+                  <span className="font-semibold text-navy-900">Key Coverage: </span>
+                  <span className="text-content-secondary">{scheme.details}</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-navy-900">Documents Needed: </span>
+                  <span className="text-content-secondary">{scheme.documentsRequired.join(' • ')}</span>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-2 border-t border-surface-border text-xs">
+                <div className="flex items-center gap-1.5 text-content-secondary">
+                  <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Helpline: <strong>{scheme.helpline}</strong></span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={scheme.officialPortal}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rc-btn-secondary text-xs py-1 px-3"
                   >
-                    <div className="space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3 text-amber-600" />
-                          Verify at PHC
-                        </span>
-                        <span className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-lg">
-                          {scheme.coverageAmount}
-                        </span>
-                      </div>
-
-                      <h3 className="font-bold text-slate-900 text-base">{scheme.name}</h3>
-                      <p className="text-[11px] text-slate-500 font-medium">{scheme.nameRegional}</p>
-                      <p className="text-xs text-slate-600 line-clamp-2">{scheme.summary}</p>
-                    </div>
-
-                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                      <span className="text-slate-400 font-medium">Helpline: {scheme.helpline}</span>
-                      <button className="text-sky-600 font-bold flex items-center gap-1 hover:underline">
-                        Details <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                    <span>Official Portal</span>
+                    <ExternalLink className="w-3 h-3 opacity-70" />
+                  </a>
+                </div>
               </div>
             </div>
-          )}
-        </div>
-      )}
-
-      {/* Official Disclaimer Badge */}
-      <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-900 flex items-start gap-3">
-        <Info className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-        <div className="space-y-1">
-          <p className="font-bold">Indicative Guidance Only — Verify at Your PHC / Ayushman Mitra</p>
-          <p className="text-[11px] text-amber-800">
-            Government scheme eligibility depends on active ration database records and hospital empanelment. Recovery Compass does not approve claims or disburse funds. Visit your Primary Health Centre or ask your ASHA worker to confirm enrolment.
-          </p>
-        </div>
+          );
+        })}
       </div>
-
-      {/* Scheme Detail Modal */}
-      {selectedScheme && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-5 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-100">
-              <div>
-                <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">
-                  {selectedScheme.coverageAmount}
-                </span>
-                <h3 className="text-xl font-bold text-slate-900 mt-2">{selectedScheme.name}</h3>
-                <p className="text-xs text-slate-500 font-medium">{selectedScheme.nameRegional}</p>
-              </div>
-              <button
-                onClick={() => setSelectedScheme(null)}
-                className="text-slate-400 hover:text-slate-600 p-2 text-sm font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-4 text-xs text-slate-700">
-              <div>
-                <h4 className="font-bold text-slate-900 mb-1">What is Covered?</h4>
-                <p className="leading-relaxed">{selectedScheme.details}</p>
-              </div>
-
-              <div className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-100 space-y-2">
-                <h4 className="font-bold text-emerald-900">Required Documents Checklist</h4>
-                <ul className="space-y-1.5 pl-2">
-                  {selectedScheme.documentsRequired.map((doc, idx) => (
-                    <li key={idx} className="flex items-center gap-2 text-emerald-800">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                      <span>{doc}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div>
-                <h4 className="font-bold text-slate-900 mb-1">How to Claim / Enrol</h4>
-                <p className="leading-relaxed text-slate-600">{selectedScheme.notes}</p>
-              </div>
-
-              <div className="pt-2 flex flex-wrap items-center justify-between gap-3 text-xs">
-                <a
-                  href={`tel:${selectedScheme.helpline.split('/')[0].trim()}`}
-                  className="px-4 py-2.5 bg-slate-900 text-white rounded-xl font-semibold flex items-center gap-2 hover:bg-slate-800"
-                >
-                  <Phone className="w-3.5 h-3.5" />
-                  Call Helpline: {selectedScheme.helpline.split('/')[0]}
-                </a>
-                <a
-                  href={selectedScheme.officialPortal}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-4 py-2.5 bg-emerald-100 text-emerald-800 rounded-xl font-semibold flex items-center gap-2 hover:bg-emerald-200"
-                >
-                  Official Govt Portal <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

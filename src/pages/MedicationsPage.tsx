@@ -20,9 +20,11 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGri
 import { usePlanStore } from '@/stores/usePlanStore';
 import { downloadRecoveryCalendar } from '@/services/calendarExport';
 import { format, addDays, parseISO, isValid } from 'date-fns';
+import { useTranslation } from '@/services/i18n';
 
 export const MedicationsPage: React.FC = () => {
   const { plan, recordMedicationAction } = usePlanStore();
+  const { t } = useTranslation();
   const [tabView, setTabView] = useState<'upcoming' | 'calendars'>('upcoming');
 
   const medications = plan.medications || [];
@@ -93,10 +95,10 @@ export const MedicationsPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
-            Medication Reminders
+            {t('medicationReminders', 'Medication Reminders')}
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Prescribed schedule extracted from your discharge instructions.
+            {t('medicationSubtitle', 'Prescribed schedule extracted from your discharge instructions.')}
           </p>
         </div>
 
@@ -108,7 +110,7 @@ export const MedicationsPage: React.FC = () => {
             }`}
           >
             <Clock className="w-3.5 h-3.5" />
-            <span>Upcoming</span>
+            {t('upcoming', 'Upcoming')}
           </button>
           <button
             onClick={() => setTabView('calendars')}
@@ -117,7 +119,7 @@ export const MedicationsPage: React.FC = () => {
             }`}
           >
             <CalendarDays className="w-3.5 h-3.5" />
-            <span>Calendars</span>
+            {t('calendarView', 'Calendar View')}
           </button>
         </div>
       </div>
@@ -139,8 +141,8 @@ export const MedicationsPage: React.FC = () => {
             {medications.length === 0 ? (
               <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-card text-center space-y-2">
                 <Pill className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                <h3 className="text-sm font-bold text-slate-800">No Medications Prescribed</h3>
-                <p className="text-xs text-slate-500">Your recovery plan currently has no active medications.</p>
+                <h3 className="text-sm font-bold text-slate-800">{t('noMedsPrescribed', 'No Medications Prescribed')}</h3>
+                <p className="text-xs text-slate-500">{t('noMedsDesc', 'Your recovery plan currently has no active medications.')}</p>
               </div>
             ) : (
               medications.map((med, idx) => {
@@ -174,7 +176,7 @@ export const MedicationsPage: React.FC = () => {
                           {med.frequency} • {med.timing}
                         </span>
                         <span className="text-[11px] text-slate-400 italic">
-                          Duration: {med.duration || '14 days'}
+                          {t('duration', 'Duration')}: {med.duration || '14 days'}
                         </span>
                       </div>
                     </div>
@@ -189,7 +191,7 @@ export const MedicationsPage: React.FC = () => {
                             : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
                         }`}
                       >
-                        Skip
+                        {t('skip', 'Skip')}
                       </button>
 
                       <button
@@ -201,7 +203,7 @@ export const MedicationsPage: React.FC = () => {
                         }`}
                       >
                         <Check className="w-3.5 h-3.5" />
-                        <span>{isTaken ? 'Taken ✓' : 'Take Dose'}</span>
+                        <span>{isTaken ? t('taken', 'Taken') + ' ✓' : t('takeMedicine', 'Take Medicine')}</span>
                       </button>
                     </div>
                   </div>
@@ -214,15 +216,15 @@ export const MedicationsPage: React.FC = () => {
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-card space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <div>
-                <h3 className="font-bold text-sm text-slate-900">Adherence History</h3>
-                <span className="text-xs text-slate-400">Weekly dose completion trend</span>
+                <h3 className="font-bold text-sm text-slate-900">{t('adherenceSummary', 'Adherence History')}</h3>
+                <span className="text-xs text-slate-400">{t('weeklyTrend', 'Weekly dose completion trend')}</span>
               </div>
 
               <div className="text-right">
                 <span className="text-2xl font-extrabold text-medical-700 block leading-none">
                   {adherenceRate}%
                 </span>
-                <span className="text-[11px] text-slate-500 font-semibold">Today's Adherence</span>
+                <span className="text-[11px] text-slate-500 font-semibold">{t('adherenceRate', "Today's Adherence")}</span>
               </div>
             </div>
 
@@ -295,11 +297,11 @@ export const MedicationsPage: React.FC = () => {
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-card space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
-                <h3 className="font-bold text-sm text-slate-900">15-Day Medication Schedule Calendar</h3>
+                <h3 className="font-bold text-sm text-slate-900">{t('fifteenDayCalendar', '15-Day Medication Schedule Calendar')}</h3>
                 <p className="text-xs text-slate-500 mt-0.5">Day-by-day prescribed doses derived from verified discharge instructions.</p>
               </div>
               <span className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
-                {medications.length} Prescribed Medicines
+                {medications.length} {t('medicines', 'Prescribed Medicines')}
               </span>
             </div>
 
@@ -315,7 +317,7 @@ export const MedicationsPage: React.FC = () => {
                 >
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-extrabold text-xs text-slate-900">
-                      Day {day.dayNum}
+                      {t('day', 'Day')} {day.dayNum}
                     </span>
                     <div className="flex items-center gap-1.5">
                       <span className="text-[11px] font-semibold text-slate-500">
@@ -323,7 +325,7 @@ export const MedicationsPage: React.FC = () => {
                       </span>
                       {day.isToday && (
                         <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-rose-700 text-white uppercase">
-                          Today
+                          {t('today', 'Today')}
                         </span>
                       )}
                     </div>
@@ -331,7 +333,7 @@ export const MedicationsPage: React.FC = () => {
 
                   <div className="space-y-1.5">
                     {day.meds.length === 0 ? (
-                      <span className="text-[11px] text-slate-400 italic">No doses scheduled</span>
+                      <span className="text-[11px] text-slate-400 italic">{t('noDosesScheduled', 'No doses scheduled')}</span>
                     ) : (
                       day.meds.map((med) => (
                         <div

@@ -39,14 +39,14 @@ export class CommunityService {
     {
       id: 'esc-demo-1',
       patientId: 'patient-sharda-01',
-      patientName: 'Sharda Patil',
-      raisedBy: 'Sunita Kamble (ASHA)',
+      patientName: 'Gurpreet Kaur',
+      raisedBy: 'Harjit Kaur (ASHA)',
       targetRole: 'ANM',
       severity: 'WARNING',
       reason: 'Persistent fever (101.4 F) on post-op Day 4 and missed morning antibiotic dose',
       status: 'ACKNOWLEDGED',
       createdAt: new Date(Date.now() - 3600000 * 3).toISOString(),
-      notes: 'ANM Rekha Gaikwad assigned for tele-checkup or home visit',
+      notes: 'ANM Manpreet Sandhu assigned for tele-checkup or home visit',
     },
   ];
 
@@ -56,14 +56,14 @@ export class CommunityService {
   ) {}
 
   async getCaseload(ashaWorkerId: string): Promise<CaseloadItem[]> {
-    // Return curated community health worker caseload matching SIH Maharashtra rural setting
+    // Return curated community health worker caseload matching Punjab Rural Health & CHC Network
     return [
       {
         patientId: 'patient-sharda-01',
-        name: 'Sharda Patil',
+        name: 'Gurpreet Kaur',
         age: 48,
         gender: 'Female',
-        village: 'Koregaon Bhima, Shirur',
+        village: 'Sahnewal Khurd, Ludhiana',
         pathway: 'POST_SURGERY',
         dischargeDate: new Date(Date.now() - 86400000 * 4).toISOString().split('T')[0],
         currentDay: 4,
@@ -79,10 +79,10 @@ export class CommunityService {
       },
       {
         patientId: 'patient-ramesh-02',
-        name: 'Ramesh Jadhav',
+        name: 'Balwinder Singh',
         age: 62,
         gender: 'Male',
-        village: 'Wagholi Rural, Haveli',
+        village: 'Dehlon Rural, Ludhiana',
         pathway: 'DIABETES',
         dischargeDate: new Date(Date.now() - 86400000 * 7).toISOString().split('T')[0],
         currentDay: 7,
@@ -97,10 +97,10 @@ export class CommunityService {
       },
       {
         patientId: 'patient-anita-03',
-        name: 'Anita Shinde',
+        name: 'Simranjit Kaur',
         age: 24,
         gender: 'Female',
-        village: 'Sanaswadi, Shirur',
+        village: 'Gill Village, Ludhiana',
         pathway: 'PREGNANCY',
         dischargeDate: new Date(Date.now() - 86400000 * 3).toISOString().split('T')[0],
         currentDay: 3,
@@ -115,10 +115,10 @@ export class CommunityService {
       },
       {
         patientId: 'patient-tukaram-04',
-        name: 'Tukaram Kadam',
+        name: 'Kulwant Singh',
         age: 55,
         gender: 'Male',
-        village: 'Pabal, Khed',
+        village: 'Majri, Kharar (SAS Nagar)',
         pathway: 'TUBERCULOSIS',
         dischargeDate: new Date(Date.now() - 86400000 * 12).toISOString().split('T')[0],
         currentDay: 12,

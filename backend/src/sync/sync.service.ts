@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { SyncPushDto, SyncPullQueryDto, SyncMutation } from './sync.dto';
 import { AuditService } from '../audit/audit.service';
+import { CommunityService } from '../community/community.service';
 
 @Injectable()
 export class SyncService {
@@ -10,6 +11,7 @@ export class SyncService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    @Optional() private readonly communityService?: CommunityService,
   ) {}
 
   async processPush(dto: SyncPushDto, userId: string) {
@@ -54,9 +56,8 @@ export class SyncService {
   private async applyMutation(mutation: SyncMutation, userId: string) {
     const { entity, action, payload } = mutation;
 
-    // In degraded/offline mode where DB might not be reachable, catch gracefully
     try {
-      if (entity === 'symptom_log' && action === 'CREATE') {
+      if (entity === 'symptom_log' && (action === 'CREATE' || action === 'UPDATE')) {
         if (this.prisma.symptomLog) {
           await this.prisma.symptomLog.create({
             data: {
@@ -70,12 +71,12 @@ export class SyncService {
             } as any,
           });
         }
-      } else if (entity === 'medication_log' && action === 'CREATE') {
+      } else if (entity === 'medication_log' && (action === 'CREATE' || action === 'UPDATE')) {
         if (this.prisma.medicationEvent) {
           await this.prisma.medicationEvent.create({
             data: {
               id: mutation.id,
-              scheduleId: payload.scheduleId || payload.medicationScheduleId || payload.medicationId,
+              scheduleId: payload.scheduleId || payload.medicationScheduleId || payload.medicationId || 'default-schedule',
               status: payload.status?.toUpperCase() === 'SKIPPED' ? 'SKIPPED' : 'TAKEN',
               actorId: userId,
               notes: payload.notes,
@@ -83,26 +84,125 @@ export class SyncService {
             } as any,
           });
         }
-      } else if (entity === 'task_event' && action === 'CREATE') {
+      } else if (entity === 'task_event' && (action === 'CREATE' || action === 'UPDATE')) {
         if (this.prisma.taskEvent) {
           await this.prisma.taskEvent.create({
             data: {
               id: mutation.id,
-              taskId: payload.taskId,
+              taskId: payload.taskId || 'default-task',
               status: payload.status?.toUpperCase() === 'COMPLETED' ? 'COMPLETED' : 'SKIPPED',
               actorId: userId,
-              notes: payload.notes,
+              notes: payload.notes || '',
               actedAt: new Date(mutation.clientTimestamp),
             } as any,
           });
         }
+        if (action === 'UPDATE' && payload.taskId && this.prisma.recoveryTask) {
+          try {
+            await this.prisma.recoveryTask.update({
+              where: { id: payload.taskId },
+              data: {
+                status: payload.status?.toUpperCase() === 'COMPLETED' ? 'COMPLETED' : 'SKIPPED',
+                completedAt: payload.status?.toUpperCase() === 'COMPLETED' ? new Date(mutation.clientTimestamp) : null,
+              } as any,
+            });
+          } catch (e: any) {
+            this.logger.debug(`RecoveryTask update deferred: ${e?.message}`);
+          }
+        }
+      } else if (entity === 'asha_visit' && (action === 'CREATE' || action === 'UPDATE')) {
+        const vitals = {
+          bloodPressureSystolic: payload.vitals?.bloodPressureSystolic,
+          bloodPressureDiastolic: payload.vitals?.bloodPressureDiastolic,
+          temperatureFahrenheit: payload.vitals?.temperatureFahrenheit,
+          bloodGlucoseMgDl: payload.vitals?.bloodGlucoseMgDl,
+          pulseBpm: payload.vitals?.pulseBpm,
+        };
+
+        if (this.communityService) {
+          await this.communityService.logVisit(
+            {
+              patientId: payload.patientId || 'unknown-patient',
+              visitDate: payload.visitDate || mutation.clientTimestamp || new Date().toISOString(),
+              medicationVerified: payload.medicationVerified ?? false,
+              medicationNotes: payload.medicationNotes,
+              remainingPillCount: payload.remainingPillCount ?? payload.blisterPillsRemaining,
+              sideEffectsReported: payload.sideEffectsReported || payload.redFlagsIdentified || [],
+              vitals,
+              notes: payload.notes || payload.medicationNotes || 'Recorded via offline sync push',
+            },
+            userId,
+          );
+        }
+
+        try {
+          await this.audit.log({
+            actorId: userId,
+            action: 'ASHA_VISIT_LOGGED',
+            resourceType: 'PatientVisit',
+            resourceId: payload.patientId || mutation.id,
+            metadata: {
+              mutationId: mutation.id,
+              patientId: payload.patientId,
+              vitals,
+              medicationVerified: payload.medicationVerified,
+              remainingPillCount: payload.remainingPillCount,
+              notes: payload.notes,
+            },
+          });
+        } catch {
+          // Degraded audit fallback
+        }
+        this.logger.log(`[Sync] Persisted offline ASHA visit mutation ${mutation.id} for patient ${payload.patientId}`);
+      } else if (entity === 'escalation' && (action === 'CREATE' || action === 'UPDATE')) {
+        const validRoles: ('ANM' | 'PHC_MEDICAL_OFFICER')[] = ['ANM', 'PHC_MEDICAL_OFFICER'];
+        const targetRole = validRoles.includes(payload.targetRole) ? (payload.targetRole as 'ANM' | 'PHC_MEDICAL_OFFICER') : 'ANM';
+        const validSeverities: ('WARNING' | 'URGENT' | 'EMERGENCY')[] = ['WARNING', 'URGENT', 'EMERGENCY'];
+        const severity = validSeverities.includes(payload.severity) ? (payload.severity as 'WARNING' | 'URGENT' | 'EMERGENCY') : 'WARNING';
+
+        if (this.communityService) {
+          await this.communityService.escalate(
+            {
+              patientId: payload.patientId || 'unknown-patient',
+              targetRole,
+              severity,
+              reason: payload.reason || 'Clinical risk review requested via offline sync',
+              triggerDetails: payload.triggerDetails,
+              currentVitalsSummary: payload.currentVitalsSummary,
+              notes: payload.notes,
+            },
+            userId,
+          );
+        }
+
+        try {
+          await this.audit.log({
+            actorId: userId,
+            action: 'RISK_ESCALATED',
+            resourceType: 'RiskEscalation',
+            resourceId: mutation.id,
+            metadata: {
+              mutationId: mutation.id,
+              patientId: payload.patientId,
+              targetRole,
+              severity,
+              reason: payload.reason,
+              notes: payload.notes,
+            },
+          });
+        } catch {
+          // Degraded audit fallback
+        }
+        this.logger.log(`[Sync] Persisted offline clinical escalation mutation ${mutation.id} for patient ${payload.patientId}`);
       }
     } catch (err: any) {
       // If unique constraint violation, this mutation was already processed (idempotent)
       if (err.code === 'P2002') {
+        this.logger.debug(`Mutation ${mutation.id} already processed (idempotent P2002)`);
         return;
       }
-      this.logger.debug(`Mutation handled: ${err.message}`);
+      this.logger.warn(`Mutation error on ${mutation.id}: ${err.message}`);
+      throw err;
     }
   }
 

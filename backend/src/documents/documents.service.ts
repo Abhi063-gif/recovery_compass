@@ -2,25 +2,16 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
-  ForbiddenException,
 } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
 import { PrismaService } from '../database/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { AuditService } from '../audit/audit.service';
 import { DocumentQualityService } from './quality/document-quality.service';
+import { PdfValidationService } from './pdf/pdf-validation.service';
+import { QueueDispatcherService } from '../queue/queue-dispatcher.service';
 import { DocumentStatus } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
-import { DOCUMENT_PROCESSING_QUEUE, JOBS } from '../workers/queue.constants';
 import * as path from 'path';
-
-const ALLOWED_MIME_TYPES = [
-  'application/pdf',
-  'image/jpeg',
-  'image/jpg',
-  'image/png',
-];
 
 @Injectable()
 export class DocumentsService {
@@ -29,7 +20,8 @@ export class DocumentsService {
     private readonly storage: StorageService,
     private readonly auditService: AuditService,
     private readonly qualityService: DocumentQualityService,
-    @InjectQueue(DOCUMENT_PROCESSING_QUEUE) private readonly queue: Queue,
+    private readonly pdfValidation: PdfValidationService,
+    private readonly queueDispatcher: QueueDispatcherService,
   ) {}
 
   async upload(
@@ -38,24 +30,19 @@ export class DocumentsService {
     userId: string,
     ipAddress?: string,
   ) {
-    // ─── 1. Strict MIME type validation ──────────────────────────────────────
-    if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-      throw new BadRequestException(`File type not allowed: ${file.mimetype}`);
-    }
+    // ─── 1. Deep Validation (0-byte, MIME, magic bytes, PDF integrity & encryption)
+    await this.pdfValidation.validateUploadFile(file);
 
-    // ─── 2. Magic byte validation (don't trust MIME header alone) ─────────────
-    await this.validateFileMagicBytes(file.buffer, file.mimetype);
-
-    // ─── 3. Generate secure storage key ──────────────────────────────────────
+    // ─── 2. Generate secure storage key ──────────────────────────────────────
     const docId = uuidv4();
     const ext = path.extname(file.originalname).toLowerCase() || '.bin';
     const safeFilename = `${docId}${ext}`;
     const storageKey = this.storage.buildDocumentKey(patientProfileId, docId, safeFilename);
 
-    // ─── 4. Upload to encrypted object storage ────────────────────────────────
+    // ─── 3. Upload to encrypted object storage ────────────────────────────────
     await this.storage.upload(storageKey, file.buffer, file.mimetype);
 
-    // ─── 5. Create database record ────────────────────────────────────────────
+    // ─── 4. Create database record ────────────────────────────────────────────
     const document = await this.prisma.sourceDocument.create({
       data: {
         id: docId,
@@ -68,18 +55,13 @@ export class DocumentsService {
       },
     });
 
-    // ─── 6. Queue for processing ──────────────────────────────────────────────
-    await this.queue.add(
-      JOBS.PROCESS_DOCUMENT,
-      { documentId: document.id, patientProfileId },
-      {
-        jobId: `doc-${document.id}`,
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 5000 },
-      },
+    // ─── 5. Safe Queue Dispatch (Redis when available, DB-backed fallback if down)
+    const dispatchRes = await this.queueDispatcher.dispatchDocumentProcessing(
+      document.id,
+      patientProfileId,
     );
 
-    // ─── 7. Audit log ─────────────────────────────────────────────────────────
+    // ─── 6. Audit log ─────────────────────────────────────────────────────────
     await this.auditService.log({
       actorId: userId,
       action: 'DOCUMENT_UPLOADED',
@@ -90,6 +72,7 @@ export class DocumentsService {
         filename: document.originalFileName,
         mimeType: file.mimetype,
         sizeBytes: file.size,
+        dispatchMode: dispatchRes.mode,
       },
       ipAddress,
     });
@@ -97,6 +80,7 @@ export class DocumentsService {
     return {
       documentId: document.id,
       status: document.status,
+      processingMode: dispatchRes.mode,
       message: 'Document uploaded successfully. Processing started.',
     };
   }
@@ -112,6 +96,16 @@ export class DocumentsService {
         pages: {
           select: { id: true, pageNumber: true, rawText: true, width: true, height: true },
         },
+        extractions: {
+          select: { id: true, status: true },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+        processingJobs: {
+          select: { id: true, status: true, attempt: true, lastError: true },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
       },
     });
 
@@ -119,7 +113,29 @@ export class DocumentsService {
       throw new NotFoundException('Document not found');
     }
 
-    return doc;
+    return {
+      ...doc,
+      extractionId: doc.extractions?.[0]?.id || null,
+      latestJob: doc.processingJobs?.[0] || null,
+    };
+  }
+
+  async getStatus(documentId: string, patientProfileId?: string) {
+    const doc = await this.findById(documentId, patientProfileId);
+
+    return {
+      id: doc.id,
+      documentId: doc.id,
+      patientProfileId: doc.patientProfileId,
+      originalFileName: doc.originalFileName,
+      status: doc.status,
+      qualityStatus: doc.qualityStatus,
+      qualityIssues: doc.qualityIssues,
+      pageCount: doc.pageCount,
+      extractionId: doc.extractionId,
+      processingJob: doc.latestJob,
+      uploadedAt: doc.uploadedAt,
+    };
   }
 
   async getPages(documentId: string, patientProfileId?: string) {
@@ -135,21 +151,13 @@ export class DocumentsService {
   async triggerProcessing(documentId: string, patientProfileId: string, userId: string) {
     const doc = await this.findById(documentId, patientProfileId);
 
-    if (
-      doc.status === DocumentStatus.OCR_PROCESSING ||
-      doc.status === DocumentStatus.EXTRACTING
-    ) {
-      throw new BadRequestException('Document is already being processed');
+    if (doc.status === DocumentStatus.CONFIRMED || doc.status === DocumentStatus.ARCHIVED) {
+      throw new BadRequestException('Document has already been verified and locked.');
     }
 
-    await this.queue.add(
-      JOBS.PROCESS_DOCUMENT,
-      { documentId, patientProfileId },
-      {
-        jobId: `doc-${documentId}-retry-${Date.now()}`,
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 5000 },
-      },
+    const dispatchRes = await this.queueDispatcher.dispatchDocumentProcessing(
+      documentId,
+      patientProfileId,
     );
 
     await this.auditService.log({
@@ -158,9 +166,14 @@ export class DocumentsService {
       resourceType: 'SourceDocument',
       resourceId: documentId,
       documentId,
+      metadata: { mode: dispatchRes.mode },
     });
 
-    return { message: 'Processing triggered', documentId };
+    return {
+      message: 'Processing triggered',
+      documentId,
+      mode: dispatchRes.mode,
+    };
   }
 
   async getQualityReport(documentId: string) {
@@ -170,34 +183,6 @@ export class DocumentsService {
     });
     if (!doc) throw new NotFoundException('Document not found');
     return doc;
-  }
-
-  private async validateFileMagicBytes(
-    buffer: Buffer,
-    declaredMimeType: string,
-  ): Promise<void> {
-    // Basic magic byte checks
-    const signatures: Record<string, Buffer[]> = {
-      'application/pdf': [Buffer.from('%PDF', 'ascii')],
-      'image/jpeg': [Buffer.from([0xff, 0xd8, 0xff])],
-      'image/jpg': [Buffer.from([0xff, 0xd8, 0xff])],
-      'image/png': [Buffer.from([0x89, 0x50, 0x4e, 0x47])],
-    };
-
-    const expected = signatures[declaredMimeType];
-    if (!expected) {
-      throw new BadRequestException('Unsupported file type');
-    }
-
-    const isValid = expected.some((sig) =>
-      buffer.subarray(0, sig.length).equals(sig),
-    );
-
-    if (!isValid) {
-      throw new BadRequestException(
-        'File content does not match declared type. File may be corrupted or misnamed.',
-      );
-    }
   }
 
   private sanitizeFilename(filename: string): string {

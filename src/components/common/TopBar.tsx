@@ -20,6 +20,7 @@ import {
   Download,
   CloudOff,
   RefreshCw,
+  Phone,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { usePlanStore } from '@/stores/usePlanStore';
@@ -33,15 +34,22 @@ export const TopBar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { user, isAuthenticated, logout } = useAuthStore();
-  const { plan, loadDemoPatient } = usePlanStore();
-  const { notifications, markNotificationRead, clearAllNotifications, language, setLanguage, isOffline } = useAppPreferencesStore();
+  const { user, isAuthenticated, logout, isDemoMode, exitDemo } = useAuthStore();
+  const { plan, loadDemoPatient, resetAll } = usePlanStore();
+  const {
+    notifications,
+    markNotificationRead,
+    clearAllNotifications,
+    language,
+    setLanguage,
+    isOffline,
+  } = useAppPreferencesStore();
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
 
-    const [outboxCount, setOutboxCount] = useState<number>(0);
+  const [outboxCount, setOutboxCount] = useState<number>(0);
   const [isSyncingOutbox, setIsSyncingOutbox] = useState<boolean>(false);
 
   React.useEffect(() => {
@@ -58,7 +66,10 @@ export const TopBar: React.FC = () => {
     const interval = setInterval(checkOutbox, 3000);
 
     const handleOnline = () => {
-      offlineStorage.syncOutbox().then(() => checkOutbox()).catch(() => {});
+      offlineStorage
+        .syncOutbox()
+        .then(() => checkOutbox())
+        .catch(() => {});
     };
 
     window.addEventListener('online', handleOnline);
@@ -89,9 +100,17 @@ export const TopBar: React.FC = () => {
   };
 
   const handleStartDemo = () => {
+    useAuthStore.getState().setDemoUser('PATIENT');
     loadDemoPatient();
     closeAllMenus();
     navigate('/dashboard');
+  };
+
+  const handleExitDemo = () => {
+    exitDemo();
+    resetAll();
+    closeAllMenus();
+    navigate('/');
   };
 
   const handleLogout = async () => {
@@ -100,17 +119,29 @@ export const TopBar: React.FC = () => {
     navigate('/');
   };
 
+  // Dedicated navigation links — strictly role-based visibility
+  const userRole = user?.role?.toUpperCase();
+  const isAshaOrAnm = Boolean(
+    isAuthenticated &&
+      user &&
+      (userRole === 'ASHA' || userRole === 'ANM' || userRole === 'ADMIN')
+  );
+
   const navLinks = [
-    { to: '/dashboard', label: t('today') },
-    { to: '/timeline', label: t('timeline') },
-    { to: '/medications', label: t('medications') },
-    { to: '/symptoms/log', label: t('symptoms') },
-    { to: '/schemes', label: t('schemes') },
-    { to: '/facilities', label: t('facilities') },
-    { to: '/asha', label: t('ashaCaseload') },
-    { to: '/anm', label: t('anmReview') },
-    ...(plan.id ? [{ to: `/verification/${plan.id}`, label: t('verification') }] : []),
-    { to: '/family', label: t('family') },
+    { to: '/dashboard', label: t('today', 'Today') },
+    { to: '/timeline', label: t('timeline', '15-Day Plan') },
+    { to: '/medications', label: t('medications', 'Medications') },
+    { to: '/symptoms/log', label: t('symptoms', 'Symptoms') },
+    { to: '/safety', label: t('safety', 'Red Flags & Safety') },
+    { to: '/schemes', label: t('schemes', 'Govt Schemes') },
+    { to: '/facilities', label: t('facilities', 'Nearby PHCs') },
+    ...(isAshaOrAnm
+      ? [
+          { to: '/asha', label: t('ashaCaseload', 'ASHA Caseload') },
+          { to: '/anm', label: t('anmReview', 'ANM Review') },
+        ]
+      : []),
+    { to: '/family', label: t('familyCircle', 'Family Circle') },
   ];
 
   const currentInitials = user?.firstName
@@ -124,7 +155,7 @@ export const TopBar: React.FC = () => {
       case 'medication':
         return <Pill className="w-4 h-4 text-sky-600" />;
       case 'task':
-        return <Activity className="w-4 h-4 text-rose-600" />;
+        return <Activity className="w-4 h-4 text-[#C8103E]" />;
       case 'safety':
         return <AlertTriangle className="w-4 h-4 text-amber-600" />;
       case 'followup':
@@ -140,55 +171,64 @@ export const TopBar: React.FC = () => {
     <>
       {/* Click-away backdrop overlay */}
       {(showNotifications || showUserMenu) && (
-        <div
-          className="fixed inset-0 z-30 bg-transparent"
-          onClick={closeAllMenus}
-        />
+        <div className="fixed inset-0 z-30 bg-black/20 backdrop-blur-[1px]" onClick={closeAllMenus} />
       )}
 
-      <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-subtle">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
-          {/* Brand Logo & Name */}
-          <Link to="/" onClick={closeAllMenus} className="flex items-center gap-2 group shrink-0">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-rose-800 to-rose-600 flex items-center justify-center text-white shadow-sm shadow-rose-200 group-hover:scale-105 transition">
-              <Compass className="w-5 h-5" />
-            </div>
-            <span className="font-bold text-lg tracking-tight text-slate-900">
-              Recovery<span className="text-rose-700">Compass</span>
+      {/* Demo Mode Notification Bar */}
+      {isDemoMode && (
+        <div className="bg-[#17243A] text-white px-4 py-1.5 text-xs font-semibold flex items-center justify-between border-b border-[#25364F]">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+            <span>
+              <strong>Demo Mode Active:</strong> Exploring Punjab Public Health Caseload (Ludhiana District).
             </span>
+          </div>
+          <button
+            onClick={handleExitDemo}
+            className="text-xs text-amber-300 hover:text-white underline font-bold transition ml-4"
+          >
+            Exit Demo
+          </button>
+        </div>
+      )}
+
+      <header className="sticky top-0 z-40 bg-white border-b border-[#E2E8F0] shadow-sm">
+        {/* Tier 1: Main Header Row (Brand Logo + Quick Actions) */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-3">
+          {/* Brand Logo & Name */}
+          <Link to="/" onClick={closeAllMenus} className="flex items-center gap-2.5 group shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-[#C8103E] flex items-center justify-center text-white shadow-sm shadow-rose-200 group-hover:scale-105 transition">
+              <Compass className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-extrabold text-base sm:text-lg tracking-tight text-[#17243A] leading-tight">
+                Recovery<span className="text-[#C8103E]">Compass</span>
+              </span>
+              <span className="text-[9px] font-semibold text-slate-400 -mt-0.5 tracking-wider uppercase">
+                Punjab Health
+              </span>
+            </div>
           </Link>
 
-          {/* Center Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-1 bg-slate-50 border border-slate-200/80 p-1 rounded-xl overflow-x-auto">
-            {navLinks.map((link) => {
-              const isActive =
-                location.pathname === link.to ||
-                (link.to !== '/' && location.pathname.startsWith(link.to));
-              return (
-                <Link
-                  key={link.to}
-                  to={link.to}
-                  onClick={closeAllMenus}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
-                    isActive
-                      ? 'bg-white text-rose-700 shadow-sm font-bold'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              );
-            })}
-          </nav>
-
-          {/* Right Actions */}
+          {/* Right Action Tools */}
           <div className="flex items-center gap-2 shrink-0">
+            {/* Direct 108 Emergency Call Shortcut */}
+            <a
+              href="tel:108"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold text-[#C8103E] bg-rose-50 border border-rose-200 hover:bg-rose-100 transition shadow-xs"
+              title="Emergency: Call 108 Ambulance"
+            >
+              <Phone className="w-3.5 h-3.5 text-[#C8103E]" />
+              <span className="hidden sm:inline">108 Ambulance</span>
+              <span className="sm:hidden">108</span>
+            </a>
+
             {/* Offline / Outbox Sync Status Indicator */}
             {isOffline || outboxCount > 0 ? (
               <div className="flex items-center gap-1.5">
                 <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
                   <CloudOff className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Saved on phone (Offline){outboxCount > 0 ? ` (${outboxCount})` : ''}</span>
+                  <span>Offline{outboxCount > 0 ? ` (${outboxCount})` : ''}</span>
                 </span>
                 <button
                   onClick={handleManualSync}
@@ -197,7 +237,7 @@ export const TopBar: React.FC = () => {
                   title="Sync pending changes with server"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isSyncingOutbox ? 'animate-spin' : ''}`} />
-                  <span>{isSyncingOutbox ? 'Syncing...' : 'Sync Now'}</span>
+                  <span className="hidden md:inline">{isSyncingOutbox ? 'Syncing...' : 'Sync Now'}</span>
                 </button>
               </div>
             ) : (
@@ -214,22 +254,22 @@ export const TopBar: React.FC = () => {
                 value={language || 'en'}
                 onChange={(e) => setLanguage(e.target.value)}
                 className="bg-transparent border-none text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
-                title="Select language (English default)"
+                title="Select language"
               >
-                <option value="en">English (Default)</option>
+                <option value="en">English</option>
+                <option value="pa">ਪੰਜਾਬੀ (Punjabi)</option>
                 <option value="hi">हिन्दी (Hindi)</option>
                 <option value="mr">मराठी (Marathi)</option>
-                <option value="pa">ਪੰਜਾਬੀ (Punjabi)</option>
                 <option value="bn">বাংলা (Bengali)</option>
                 <option value="ta">தமிழ் (Tamil)</option>
               </select>
             </div>
 
-            {/* Offline .ICS Phone Calendar Alarms Export (PRD Section 7.3) */}
+            {/* Offline .ICS Calendar Export */}
             {plan.id && (
               <button
                 onClick={() => downloadRecoveryCalendar(plan)}
-                className="hidden sm:flex items-center gap-1 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl transition"
+                className="hidden lg:flex items-center gap-1 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded-xl transition"
                 title="Export offline .ics calendar alarms to phone calendar"
               >
                 <Download className="w-3.5 h-3.5 text-slate-600" />
@@ -238,14 +278,16 @@ export const TopBar: React.FC = () => {
             )}
 
             {/* Try Demo Button */}
-            <button
-              onClick={handleStartDemo}
-              className="flex items-center gap-1.5 text-xs font-bold bg-rose-700 hover:bg-rose-800 text-white px-3 py-1.5 rounded-xl shadow-sm transition"
-              title="Load Synthetic Patient Recovery Plan"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Try Demo</span>
-            </button>
+            {!isDemoMode && (
+              <button
+                onClick={handleStartDemo}
+                className="flex items-center gap-1.5 text-xs font-bold bg-[#C8103E] hover:bg-rose-800 text-white px-3 py-1.5 rounded-xl shadow-sm transition"
+                title="Load Punjab Synthetic Patient Recovery Plan"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Try Demo</span>
+              </button>
+            )}
 
             {/* Notifications Bell */}
             <div className="relative">
@@ -259,7 +301,7 @@ export const TopBar: React.FC = () => {
               >
                 <Bell className="w-4 h-4" />
                 {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 w-2 h-2 bg-rose-600 rounded-full" />
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-[#C8103E] rounded-full" />
                 )}
               </button>
 
@@ -273,7 +315,7 @@ export const TopBar: React.FC = () => {
                     {notifications.length > 0 && (
                       <button
                         onClick={clearAllNotifications}
-                        className="text-[11px] text-rose-700 hover:underline font-semibold"
+                        className="text-[11px] text-[#C8103E] hover:underline font-semibold"
                       >
                         Clear all
                       </button>
@@ -307,7 +349,7 @@ export const TopBar: React.FC = () => {
                             <span className="text-[10px] text-slate-400 block mt-1">Today</span>
                           </div>
                           {!n.isRead && (
-                            <span className="w-2 h-2 rounded-full bg-rose-600 shrink-0 mt-1.5" />
+                            <span className="w-2 h-2 rounded-full bg-[#C8103E] shrink-0 mt-1.5" />
                           )}
                         </div>
                       ))}
@@ -318,7 +360,7 @@ export const TopBar: React.FC = () => {
                     <Link
                       to="/notifications"
                       onClick={closeAllMenus}
-                      className="text-xs font-bold text-rose-700 hover:underline"
+                      className="text-xs font-bold text-[#C8103E] hover:underline"
                     >
                       View All Notifications & History →
                     </Link>
@@ -338,7 +380,7 @@ export const TopBar: React.FC = () => {
                   className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 transition"
                   aria-label="User profile and menu"
                 >
-                  <div className="w-7 h-7 rounded-lg bg-rose-700 text-white font-bold text-xs flex items-center justify-center">
+                  <div className="w-7 h-7 rounded-lg bg-[#17243A] text-white font-bold text-xs flex items-center justify-center">
                     {currentInitials}
                   </div>
                   <span className="text-xs font-bold text-slate-800 hidden lg:inline max-w-[100px] truncate">
@@ -350,10 +392,15 @@ export const TopBar: React.FC = () => {
                 {showUserMenu && (
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-elevated border border-slate-200 p-2 z-50 animate-in fade-in text-xs space-y-1">
                     <div className="px-3 py-2 border-b border-slate-100">
-                      <span className="font-bold text-slate-900 block truncate">
-                        {user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email?.split('@')[0] : 'User'}
-                      </span>
-                      <span className="text-[10px] text-slate-500 block truncate">{user?.email || ''}</span>
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-bold text-slate-900 block truncate">
+                          {user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email?.split('@')[0] : 'User'}
+                        </span>
+                        <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 uppercase shrink-0">
+                          {user?.role || 'PATIENT'}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 block truncate mt-0.5">{user?.email || ''}</span>
                     </div>
 
                     <Link
@@ -408,12 +455,38 @@ export const TopBar: React.FC = () => {
             )}
           </div>
         </div>
+
+        {/* Tier 2: Dedicated Clinical Navigation Sub-Bar — Authenticated Access Only */}
+        {isAuthenticated && user && (
+          <div className="border-t border-[#E2E8F0] bg-white">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 overflow-x-auto no-scrollbar scroll-smooth">
+              <nav className="flex items-center gap-1.5 min-w-max">
+                {navLinks.map((link) => {
+                  const isActive =
+                    location.pathname === link.to ||
+                    (link.to !== '/' && location.pathname.startsWith(link.to));
+                  return (
+                    <Link
+                      key={link.to}
+                      to={link.to}
+                      onClick={closeAllMenus}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-150 flex items-center gap-1.5 shrink-0 ${
+                        isActive
+                          ? 'bg-[#17243A] text-white font-bold shadow-xs'
+                          : 'bg-[#F5F7FA] text-slate-600 hover:text-[#17243A] hover:bg-slate-200/80 border border-transparent'
+                      }`}
+                    >
+                      <span>{link.label}</span>
+                    </Link>
+                  );
+                })}
+              </nav>
+            </div>
+          </div>
+        )}
       </header>
 
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-      />
+      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
     </>
   );
 };

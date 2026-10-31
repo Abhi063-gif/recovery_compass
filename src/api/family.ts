@@ -37,6 +37,36 @@ export interface FamilyInvitationResponse {
   otpCode?: string;
   token?: string;
   otp?: string;
+  emailSent?: boolean;
+}
+
+export interface CaregiverPatientOverview {
+  hasPatient: boolean;
+  patientName: string;
+  relationship: string;
+  pathway: string;
+  surgeryDate?: string;
+  currentDay: number;
+  adherenceRate: number;
+  activeRedFlags: number;
+  permissions: string[];
+  todayMedications: Array<{
+    id: string;
+    name: string;
+    dose: string;
+    time: string;
+    status: 'PENDING' | 'TAKEN' | 'SKIPPED';
+  }>;
+  recentVitals: {
+    painScore: number;
+    temperature: number;
+    lastLoggedAt: string;
+  };
+  ashaWorker?: {
+    name: string;
+    phone: string;
+    village: string;
+  };
 }
 
 export const familyApi = {
@@ -44,10 +74,14 @@ export const familyApi = {
     planId: string,
     email: string,
     permissions: BackendCaregiverPermission[],
+    name?: string,
+    relationship?: string,
   ): Promise<FamilyInvitationResponse> => {
     return apiClient.post<FamilyInvitationResponse>(`/plans/${planId}/family/invite`, {
       email,
       permissions,
+      name,
+      relationship,
     });
   },
 
@@ -75,5 +109,9 @@ export const familyApi = {
 
   getMembers: async (): Promise<BackendFamilyMember[]> => {
     return apiClient.get<BackendFamilyMember[]>('/family/members');
+  },
+
+  getPatientOverview: async (): Promise<CaregiverPatientOverview> => {
+    return apiClient.get<CaregiverPatientOverview>('/family/patient-overview');
   },
 };

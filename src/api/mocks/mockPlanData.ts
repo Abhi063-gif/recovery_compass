@@ -2,8 +2,8 @@ import { ExtractionField, MedicationItem, RecoveryPlan, RecoveryTask, RedFlagRul
 
 export const SYNTHETIC_DISCHARGE_TEXT = `
 ST. JUDE MEMORIAL HOSPITAL — SURGICAL DISCHARGE SUMMARY
-Patient: Eleanor Vance | DOB: 14-Aug-1958 | MRN: 90284-A
-Attending Surgeon: Dr. Sarah Jenkins, MD, FACS | Department: General Surgery
+Patient: Gurpreet Kaur | DOB: 14-Aug-1958 | MRN: 90284-A
+Attending Surgeon: Dr. Harinder Singh Dhillon, MS (Surgery) | Department: General Surgery
 Procedure: Laparoscopic Cholecystectomy & Adhesiolysis
 Surgery Date: 26-Sep-2026 | Discharge Date: 28-Sep-2026
 
@@ -388,7 +388,7 @@ export const MOCK_FOLLOW_UPS: FollowUpAppointment[] = [
     time: '10:30 AM',
     clinician: 'Dr. Sarah Jenkins, MD',
     specialty: 'General Surgery & Laparoscopy',
-    location: 'Surgical Pavilion, Suite 410, St. Jude Memorial Hospital',
+    location: 'Surgical Pavilion, Suite 410, Civil Hospital Ludhiana (Punjab Health)',
     purpose: 'Post-operative incision check, suture evaluation, and pathology review',
     tests: ['Complete Blood Count (CBC)', 'Liver Function Panel (LFTs)'],
     preparation: 'Complete pre-visit blood tests 48 hours prior at outpatient lab. Bring medicine list.',
@@ -427,10 +427,10 @@ export const MOCK_DOCTOR_QUESTIONS: DoctorQuestion[] = [
 export const MOCK_FAMILY_MEMBERS: FamilyMember[] = [
   {
     id: 'fam-1',
-    name: 'David Vance',
+    name: 'Jaswinder Singh',
     relationship: 'Spouse / Primary Caregiver',
     email: 'david.vance@example.com',
-    phone: '+1 (555) 839-2041',
+    phone: '+91 98765 43210',
     status: 'active',
     permissions: {
       viewPlan: true,
@@ -494,20 +494,20 @@ export const MOCK_SYMPTOM_HISTORY: SymptomLog[] = [
 export const MOCK_INITIAL_PLAN: RecoveryPlan = {
   id: 'plan-chole-90284',
   patientProfile: {
-    name: 'Eleanor Vance',
+    name: 'Gurpreet Kaur',
     role: 'patient',
     language: 'en',
     surgeryDate: '2026-09-26',
     dischargeDate: '2026-09-28',
     pathway: 'Post-surgery recovery — Laparoscopic Cholecystectomy',
     emergencyContact: {
-      name: 'David Vance',
-      phone: '+1 (555) 839-2041',
+      name: 'Jaswinder Singh',
+      phone: '+91 98765 43210',
       relationship: 'Spouse'
     },
-    hospitalName: 'St. Jude Memorial Hospital',
-    surgeonName: 'Dr. Sarah Jenkins, MD, FACS',
-    clinicPhone: '+1 (555) 382-9010'
+    hospitalName: 'Civil Hospital Ludhiana (Punjab Health)',
+    surgeonName: 'Dr. Harinder Singh Dhillon, MS (Surgery)',
+    clinicPhone: '0161-2444108'
   },
   currentDay: 1,
   totalDays: 14,

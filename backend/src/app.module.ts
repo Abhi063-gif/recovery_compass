@@ -1,4 +1,4 @@
-import { Module, DynamicModule } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { BullModule } from '@nestjs/bull';
@@ -30,6 +30,8 @@ import { RagModule } from './rag/rag.module';
 import { HealthModule } from './health/health.module';
 import { SyncModule } from './sync/sync.module';
 import { CommunityModule } from './community/community.module';
+import { QueueModule } from './queue/queue.module';
+import { createProducerRedisOptions } from './queue/redis.config';
 
 @Module({
   imports: [
@@ -51,19 +53,17 @@ import { CommunityModule } from './community/community.module';
       ],
     }),
 
-    // Queue system — OPTIONAL: only when REDIS_URL is configured
-    // When Redis is unavailable, OCR/extraction run synchronously
-    ...(process.env.REDIS_URL && process.env.REDIS_URL !== 'redis://localhost:6379'
-      ? [
-          BullModule.forRootAsync({
-            inject: [ConfigService],
-            useFactory: (cfg: ConfigService) => ({
-              redis: cfg.get<string>('REDIS_URL', 'redis://localhost:6379'),
-            }),
-          }),
-          WorkersModule,
-        ]
-      : []),
+    // Bull Queue Configuration with bounded retries & fast-fail producer behavior
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (cfg: ConfigService) => ({
+        redis: createProducerRedisOptions(cfg) as any,
+      }),
+    }),
+
+    // Background queues & workers
+    QueueModule,
+    WorkersModule,
 
     // CRON / scheduled tasks
     ScheduleModule.forRoot(),
@@ -118,4 +118,3 @@ import { CommunityModule } from './community/community.module';
   ],
 })
 export class AppModule {}
-

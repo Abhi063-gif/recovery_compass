@@ -113,7 +113,11 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   isSyncing: false,
   syncError: null,
 
-  setUploadedFile: (file) => set({ uploadedFile: file }),
+  setUploadedFile: (file) => set((state) => ({
+    uploadedFile: file,
+    uploadedDocumentId: null,
+    plan: file ? { ...state.plan, extractions: [] } : state.plan,
+  })),
   setPatientProfile: (profile) => {
     set((state) => ({
       plan: {

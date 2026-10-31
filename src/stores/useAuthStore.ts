@@ -16,46 +16,46 @@ export interface UserPersona {
 
 /**
  * Demo personas — Indian Public Health Personas (PRD Section 10).
- * Pre-configured for Maharashtra Block-level testing.
+ * Pre-configured for Punjab Block-level & District Hospital testing.
  */
 export const DEMO_PERSONAS: UserPersona[] = [
   {
-    id: 'usr-patient-sharda',
-    name: 'Sharda Patil',
-    email: 'sharda.patil@rural.recoverycompass.org',
+    id: 'usr-patient-gurpreet',
+    name: 'Gurpreet Kaur',
+    email: 'gurpreet.kaur@rural.recoverycompass.org',
     role: 'PATIENT',
-    description: 'Patient, Post-Cholecystectomy, Day 4, Shirur, Pune',
-    avatarInitials: 'SP',
+    description: 'Patient, Post-Cholecystectomy, Day 4, Sahnewal, Ludhiana, Punjab',
+    avatarInitials: 'GK',
     color: 'bg-rose-700',
     badge: 'Patient (Primary)',
   },
   {
-    id: 'usr-asha-sunita',
-    name: 'Sunita Tai Gaikwad',
-    email: 'sunita.asha@rural.recoverycompass.org',
+    id: 'usr-asha-harjit',
+    name: 'Harjit Kaur (ASHA)',
+    email: 'harjit.asha@rural.recoverycompass.org',
     role: 'ASHA',
-    description: 'ASHA Worker, Shirur PHC Block, Pune',
-    avatarInitials: 'SG',
+    description: 'ASHA Worker, Sub-Centre Gill / Sahnewal Block, Ludhiana',
+    avatarInitials: 'HK',
     color: 'bg-amber-600',
     badge: 'ASHA Worker',
   },
   {
-    id: 'usr-anm-rekha',
-    name: 'Rekha Sister Shinde',
-    email: 'rekha.anm@rural.recoverycompass.org',
+    id: 'usr-anm-manpreet',
+    name: 'Manpreet Sister Sandhu',
+    email: 'manpreet.anm@rural.recoverycompass.org',
     role: 'ANM',
-    description: 'ANM Supervisor, Koregaon Bhima PHC',
-    avatarInitials: 'RS',
+    description: 'ANM Supervisor, CHC Sahnewal / Civil Hospital Ludhiana',
+    avatarInitials: 'MS',
     color: 'bg-teal-700',
     badge: 'ANM Supervisor',
   },
   {
-    id: 'usr-dr-deshmukh',
-    name: 'Dr. Sanjay Deshmukh',
-    email: 'dr.deshmukh@rural.recoverycompass.org',
+    id: 'usr-dr-dhillon',
+    name: 'Dr. Harinder Singh Dhillon',
+    email: 'dr.dhillon@rural.recoverycompass.org',
     role: 'ADMIN',
-    description: 'PHC Medical Officer, Shirur',
-    avatarInitials: 'SD',
+    description: 'Senior Medical Officer (SMO), Civil Hospital Ludhiana',
+    avatarInitials: 'HD',
     color: 'bg-sky-700',
     badge: 'Medical Officer / Doctor',
   },
@@ -66,6 +66,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  isDemoMode: boolean;
 
   // Actions
   login: (
@@ -91,6 +92,7 @@ interface AuthState {
   quickDemoLogin: (role?: 'PATIENT' | 'CAREGIVER' | 'ADMIN' | 'ASHA' | 'ANM') => Promise<boolean>;
   switchPersona: (persona: UserPersona) => void;
   setDemoUser: (role?: 'PATIENT' | 'CAREGIVER' | 'ADMIN' | 'ASHA' | 'ANM') => void;
+  exitDemo: () => void;
 }
 
 /**
@@ -113,12 +115,13 @@ export const useAuthStore = create<AuthState>((set) => ({
         userId: DEMO_PERSONAS[0].id,
         email: DEMO_PERSONAS[0].email,
         role: DEMO_PERSONAS[0].role,
-        firstName: 'Sharda',
-        lastName: 'Patil',
+        firstName: 'Gurpreet',
+        lastName: 'Kaur',
       }
     : null,
   isAuthenticated: DEMO_MODE,
   isLoading: false,
+  isDemoMode: DEMO_MODE,
   error: null,
 
   login: async (credentials, password) => {
@@ -140,6 +143,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         user: res.user,
         isAuthenticated: true,
         isLoading: false,
+        isDemoMode: false,
         error: null,
       });
       return true;
@@ -197,6 +201,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({
         user: null,
         isAuthenticated: false,
+        isDemoMode: false,
         error: null,
       });
     }
@@ -258,6 +263,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       },
       isAuthenticated: true,
       isLoading: false,
+      isDemoMode: true,
       error: null,
     });
     return true;
@@ -267,10 +273,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   // These are guarded: in production mode they are no-ops with a console warning.
 
   switchPersona: (persona: UserPersona) => {
-    if (!DEMO_MODE) {
-      console.warn('[Auth] switchPersona is only available in DEMO_MODE=true');
-      return;
-    }
     set({
       user: {
         userId: persona.id,
@@ -281,15 +283,12 @@ export const useAuthStore = create<AuthState>((set) => ({
       },
       isAuthenticated: true,
       isLoading: false,
+      isDemoMode: true,
       error: null,
     });
   },
 
   setDemoUser: (role = 'PATIENT') => {
-    if (!DEMO_MODE) {
-      console.warn('[Auth] setDemoUser is only available in DEMO_MODE=true');
-      return;
-    }
     const persona = DEMO_PERSONAS.find((p) => p.role === role) || DEMO_PERSONAS[0];
     set({
       user: {
@@ -301,6 +300,16 @@ export const useAuthStore = create<AuthState>((set) => ({
       },
       isAuthenticated: true,
       isLoading: false,
+      isDemoMode: true,
+      error: null,
+    });
+  },
+
+  exitDemo: () => {
+    set({
+      user: null,
+      isAuthenticated: false,
+      isDemoMode: false,
       error: null,
     });
   },

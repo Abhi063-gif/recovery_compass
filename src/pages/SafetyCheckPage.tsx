@@ -6,13 +6,15 @@ import {
   FileText,
   ShieldAlert,
   ArrowRight,
-  ExternalLink
+  ExternalLink,
 } from 'lucide-react';
 import { usePlanStore } from '@/stores/usePlanStore';
 import { useSafetyStore } from '@/stores/useSafetyStore';
+import { useTranslation } from '@/services/i18n';
 
 export const SafetyCheckPage: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const plan = usePlanStore((s) => s.plan);
   const activeAlert = useSafetyStore((s) => s.activeAlert);
   const triggerManualEmergency = useSafetyStore((s) => s.triggerManualEmergency);
@@ -22,22 +24,28 @@ export const SafetyCheckPage: React.FC = () => {
   const recommendedAction = activeAlert?.actionRequired || 'Contact your clinician immediately. Do not delay if temperature stays above 101°F.';
   const doctorPhone = activeAlert?.doctorPhone || plan.patientProfile?.clinicPhone || '104';
 
-  const planIdToUse = plan?.id || 'plan-chole-90284';
+  const planIdToUse = plan?.id || 'plan-demo-punjab';
 
   return (
     <div className="max-w-xl mx-auto py-6 space-y-6">
-      {/* High-Visibility Card (Directly matching Wireframe 11) */}
+      {/* High-Visibility Danger Card */}
       <div className="bg-white rounded-3xl p-6 sm:p-8 border border-urgentRed-200 shadow-card text-center space-y-6">
         <div className="w-16 h-16 rounded-full bg-urgentRed-100 text-urgentRed-600 flex items-center justify-center mx-auto shadow-sm">
           <AlertTriangle className="w-8 h-8" />
         </div>
+        <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 uppercase tracking-wider">
+          {t('redFlagSafety', 'Red Flags & Safety')}
+        </span>
 
         <div className="space-y-1.5">
           <h1 className="text-2xl font-bold text-urgentRed-950">
-            Urgent Attention Required
+            {t('urgentAttention', 'Urgent Attention Required')}
           </h1>
           <p className="text-xs text-slate-600 max-w-sm mx-auto">
-            Your logged symptom matches a warning sign in your recovery instructions.
+            {t(
+              'urgentSubtitle',
+              'Your logged symptom matches a warning sign in your recovery instructions.',
+            )}
           </p>
         </div>
 
@@ -47,7 +55,7 @@ export const SafetyCheckPage: React.FC = () => {
             <div className="w-3 h-3 rounded-full bg-urgentRed-600 shrink-0 mt-1" />
             <div>
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
-                Warning Sign
+                {t('warningSign', 'Warning Sign')}
               </span>
               <h3 className="font-bold text-sm text-slate-900 mt-0.5">
                 {warningSign}
@@ -60,7 +68,7 @@ export const SafetyCheckPage: React.FC = () => {
 
           <div className="pt-2 border-t border-slate-200/80">
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
-              Recommended Action
+              {t('recommendedAction', 'Recommended Action')}
             </span>
             <p className="text-xs font-semibold text-slate-800 mt-0.5">
               {recommendedAction}
@@ -75,25 +83,29 @@ export const SafetyCheckPage: React.FC = () => {
             className="w-full py-3.5 bg-rose-700 hover:bg-rose-800 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-2"
           >
             <PhoneCall className="w-4 h-4" />
-            <span>Call Your Clinician ({doctorPhone})</span>
+            <span>
+              {t('callClinician', 'Call Your Clinician')} ({doctorPhone})
+            </span>
           </a>
 
           <button
             onClick={() => navigate(`/verification/${planIdToUse}`)}
             className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition"
           >
-            View Source Instructions
+            {t('viewSource', 'View Source Instructions')}
           </button>
         </div>
 
         {/* Bottom Emergency Help Disclaimer */}
         <div className="pt-2 text-center text-xs text-urgentRed-700 font-medium">
-          If you feel this is a medical emergency,{' '}
           <button
             onClick={triggerManualEmergency}
             className="underline font-bold hover:text-urgentRed-900"
           >
-            seek emergency help now: Call 108 (Ambulance) or 104 (Health Helpline).
+            {t(
+              'emergencyDisclaimer',
+              'If you feel this is a medical emergency, seek emergency help now: Call 108 (Ambulance) or 104 (Health Helpline).',
+            )}
           </button>
         </div>
       </div>

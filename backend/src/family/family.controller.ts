@@ -4,10 +4,10 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles, CurrentUser, Public } from '../common/decorators';
+import { Roles, CurrentUser } from '../common/decorators';
 import { FamilyService } from './family.service';
 import { UserRole, CaregiverPermission } from '@prisma/client';
-import { IsArray, IsEmail, IsEnum, IsString } from 'class-validator';
+import { IsArray, IsEmail, IsEnum, IsOptional, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { UsersService } from '../users/users.service';
 
@@ -15,6 +15,16 @@ class InviteDto {
   @ApiProperty()
   @IsEmail()
   email: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  relationship?: string;
 
   @ApiProperty({ enum: CaregiverPermission, isArray: true })
   @IsArray()
@@ -54,11 +64,11 @@ export class FamilyController {
     @CurrentUser() user: any,
   ) {
     const profile = await this.usersService.getPatientProfile(user.sub);
-    return this.familyService.invite(profile.id, user.sub, dto.email, dto.permissions);
+    return this.familyService.invite(profile.id, user.sub, dto.email, dto.permissions, dto.name, dto.relationship);
   }
 
   @Post('family/invitations/:token/accept')
-  @Roles(UserRole.CAREGIVER)
+  @Roles(UserRole.CAREGIVER, UserRole.PATIENT)
   @ApiOperation({ summary: 'Accept a family invitation using token + OTP' })
   async accept(
     @Param('token') token: string,
@@ -92,5 +102,12 @@ export class FamilyController {
   async getMembers(@CurrentUser() user: any) {
     const profile = await this.usersService.getPatientProfile(user.sub);
     return this.familyService.getFamilyMembers(profile.id);
+  }
+
+  @Get('family/patient-overview')
+  @Roles(UserRole.CAREGIVER, UserRole.PATIENT)
+  @ApiOperation({ summary: 'Get active patient recovery overview for caregiver oversight' })
+  async getPatientOverview(@CurrentUser() user: any) {
+    return this.familyService.getCaregiverPatientOverview(user.sub);
   }
 }

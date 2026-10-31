@@ -100,6 +100,17 @@ export class DocumentsController {
     return this.documentsService.findById(id, patientProfile.id);
   }
 
+  @Get(':id/status')
+  @Roles(UserRole.PATIENT, UserRole.CAREGIVER, UserRole.ASHA, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get document processing status and extraction ID for polling' })
+  async getStatus(@Param('id') id: string, @CurrentUser() user: any) {
+    if (user.role === UserRole.CAREGIVER || user.role === UserRole.ASHA || user.role === UserRole.ADMIN) {
+      return this.documentsService.getStatus(id);
+    }
+    const patientProfile = await this.usersService.getPatientProfile(user.sub);
+    return this.documentsService.getStatus(id, patientProfile.id);
+  }
+
   @Post(':id/process')
   @Roles(UserRole.PATIENT, UserRole.ASHA, UserRole.ADMIN)
   @ApiOperation({ summary: 'Trigger or re-trigger document processing' })
