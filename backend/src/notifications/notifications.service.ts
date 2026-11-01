@@ -77,8 +77,8 @@ export class NotificationsService {
           delay,
           attempts: 5,
           backoff: { type: 'exponential', delay: 30000 },
-          removeOnComplete: false,
-          removeOnFail: false,
+          removeOnComplete: 100, // Keep only recent 100 jobs to prevent memory leaks in Redis
+          removeOnFail: 50,      // Keep only recent 50 failed jobs for diagnostics
         },
       );
     } catch (queueErr: any) {

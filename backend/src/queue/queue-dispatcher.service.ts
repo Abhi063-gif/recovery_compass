@@ -64,7 +64,7 @@ export class QueueDispatcherService {
             attempts: 3,
             backoff: { type: 'exponential', delay: 5000 },
             removeOnComplete: true,
-            removeOnFail: false,
+            removeOnFail: 50, // Keep only recent 50 failed jobs for diagnostics, auto-free the rest
           },
         );
 
