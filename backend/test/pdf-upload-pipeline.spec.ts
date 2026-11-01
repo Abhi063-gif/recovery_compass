@@ -1,8 +1,9 @@
+/// <reference types="multer" />
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BadRequestException } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
-import { PdfValidationService } from '../src/documents/pdf/pdf-validation.service';
+import { PdfValidationService, UploadedFileLike } from '../src/documents/pdf/pdf-validation.service';
 import { TesseractProvider } from '../src/ocr/providers/tesseract.provider';
 import { QueueDispatcherService } from '../src/queue/queue-dispatcher.service';
 import { DocumentPipelineRunner } from '../src/queue/document-pipeline.runner';
@@ -71,24 +72,24 @@ describe('PDF Upload, OCR, Redis & BullMQ Pipeline Robustness', () => {
   // ─── Scenario 3: Empty PDF (0 bytes or tiny buffer) ─────────────────────────
   it('Scenario 3: rejects empty 0-byte file and tiny malformed buffer', async () => {
     // 0-byte file
-    const emptyFile = {
+    const emptyFile: UploadedFileLike = {
       buffer: Buffer.alloc(0),
       size: 0,
       mimetype: 'application/pdf',
       originalname: 'empty.pdf',
-    } as any;
+    };
 
     await expect(pdfValidator.validateUploadFile(emptyFile)).rejects.toThrow(BadRequestException);
     await expect(pdfValidator.validateUploadFile(emptyFile)).rejects.toThrow(/empty/i);
 
     // Buffer under 50 bytes
     const tinyBuffer = Buffer.from('%PDF-1.4');
-    const tinyFile = {
+    const tinyFile: UploadedFileLike = {
       buffer: tinyBuffer,
       size: tinyBuffer.length,
       mimetype: 'application/pdf',
       originalname: 'tiny.pdf',
-    } as any;
+    };
 
     await expect(pdfValidator.validateUploadFile(tinyFile)).rejects.toThrow(/too small/i);
   });
