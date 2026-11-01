@@ -15,6 +15,7 @@ import { RedisOptions } from 'ioredis';
 export interface ParsedRedisConnection {
   host: string;
   port: number;
+  username?: string;
   password?: string;
   db?: number;
   tls?: boolean;
@@ -26,6 +27,7 @@ export function parseRedisUrl(urlStr: string): ParsedRedisConnection {
     return {
       host: url.hostname || 'localhost',
       port: parseInt(url.port || '6379', 10),
+      username: url.username ? decodeURIComponent(url.username) : undefined,
       password: url.password ? decodeURIComponent(url.password) : undefined,
       db: url.pathname && url.pathname.length > 1 ? parseInt(url.pathname.slice(1), 10) : 0,
       tls: url.protocol === 'rediss:',
@@ -51,6 +53,7 @@ export function createProducerRedisOptions(cfg?: ConfigService): RedisOptions {
   return {
     host: parsed.host,
     port: parsed.port,
+    username: parsed.username,
     password: parsed.password,
     db: parsed.db,
     tls: parsed.tls ? {} : undefined,
@@ -73,7 +76,7 @@ export function createProducerRedisOptions(cfg?: ConfigService): RedisOptions {
 }
 
 /**
- * Configuration for Workers (e.g. BullMQ / Bull background processors)
+ * Configuration for Workers and Bull Queues (e.g. Bull background processors).
  * maxRetriesPerRequest must be null for worker blocking connections.
  */
 export function createWorkerRedisOptions(cfg?: ConfigService): RedisOptions {
@@ -83,15 +86,24 @@ export function createWorkerRedisOptions(cfg?: ConfigService): RedisOptions {
   return {
     host: parsed.host,
     port: parsed.port,
+    username: parsed.username,
     password: parsed.password,
     db: parsed.db,
     tls: parsed.tls ? {} : undefined,
-    maxRetriesPerRequest: null, // Required by BullMQ for blocking commands
+    maxRetriesPerRequest: null, // Required by BullMQ / Bull for blocking commands
     connectTimeout: 5000,
     lazyConnect: true,
     retryStrategy: (times: number) => {
       return Math.min(times * 500, 5000);
     },
   };
+}
+
+/**
+ * Lightweight, fast-fail configuration for Health Checks (RedisHealthService).
+ * Uses maxRetriesPerRequest: 1 so HTTP health endpoints fail fast if Redis goes offline.
+ */
+export function createHealthRedisOptions(cfg?: ConfigService): RedisOptions {
+  return createProducerRedisOptions(cfg);
 }
 

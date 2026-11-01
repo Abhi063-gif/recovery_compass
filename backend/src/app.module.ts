@@ -31,7 +31,7 @@ import { HealthModule } from './health/health.module';
 import { SyncModule } from './sync/sync.module';
 import { CommunityModule } from './community/community.module';
 import { QueueModule } from './queue/queue.module';
-import { createProducerRedisOptions } from './queue/redis.config';
+import { createWorkerRedisOptions } from './queue/redis.config';
 
 @Module({
   imports: [
@@ -53,11 +53,11 @@ import { createProducerRedisOptions } from './queue/redis.config';
       ],
     }),
 
-    // Bull Queue Configuration with bounded retries & fast-fail producer behavior
+    // Bull Queue Configuration with worker-compatible blocking client options (maxRetriesPerRequest: null)
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (cfg: ConfigService) => ({
-        redis: createProducerRedisOptions(cfg) as any,
+        redis: createWorkerRedisOptions(cfg) as any,
       }),
     }),
 

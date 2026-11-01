@@ -1,7 +1,7 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
-import { createProducerRedisOptions } from './redis.config';
+import { createHealthRedisOptions } from './redis.config';
 import { LoggerService } from '../common/logger/logger.service';
 
 export interface RedisHealthResult {
@@ -34,7 +34,7 @@ export class RedisHealthService implements OnModuleInit, OnModuleDestroy {
     if (this.client) return;
 
     try {
-      const options = createProducerRedisOptions(this.cfg);
+      const options = createHealthRedisOptions(this.cfg);
       this.client = new Redis(options);
 
       this.client.on('connect', () => {
