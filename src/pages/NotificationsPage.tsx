@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Bell,
   CheckCircle2,
@@ -12,8 +12,12 @@ import {
 import { useAppPreferencesStore } from '@/stores/useAppPreferencesStore';
 
 export const NotificationsPage: React.FC = () => {
-  const { notifications, markNotificationRead } = useAppPreferencesStore();
+  const { notifications, markNotificationRead, fetchNotifications } = useAppPreferencesStore();
   const [activeTab, setActiveTab] = useState<'all' | 'medication' | 'alerts' | 'system'>('all');
+
+  useEffect(() => {
+    fetchNotifications().catch(() => {});
+  }, [fetchNotifications]);
 
   const [prefs, setPrefs] = useState({
     medication: true,

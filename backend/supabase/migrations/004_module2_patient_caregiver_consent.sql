@@ -53,7 +53,10 @@ AS $$
   );
 $$;
 
--- ── Step 1: Enable Row Level Security ─────────────────────────
+-- ── Step 1: Covering Indexes & Enable Row Level Security ────
+CREATE INDEX IF NOT EXISTS "FamilyInvitation_invitedByUserId_idx"
+  ON "public"."FamilyInvitation"("invitedByUserId");
+
 ALTER TABLE "public"."PatientProfile" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."CaregiverProfile" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."FamilyInvitation" ENABLE ROW LEVEL SECURITY;
@@ -90,19 +93,24 @@ DROP POLICY IF EXISTS "deny_direct_browser_access" ON "public"."FamilyMembership
 DROP POLICY IF EXISTS "deny_direct_browser_access" ON "public"."ConsentRecord";
 
 -- ── Step 3: Column-Level Privilege Lockdown on Sensitive Tables ─
-REVOKE ALL ON TABLE "public"."PatientProfile" FROM anon;
-REVOKE ALL ON TABLE "public"."CaregiverProfile" FROM anon;
-REVOKE ALL ON TABLE "public"."FamilyInvitation" FROM anon;
-REVOKE ALL ON TABLE "public"."FamilyMembership" FROM anon;
-REVOKE ALL ON TABLE "public"."ConsentRecord" FROM anon;
-
--- Protect invitation secret tokens and OTP codes from browser select
-REVOKE SELECT (tokenHash, otpCode) ON TABLE "public"."FamilyInvitation" FROM authenticated;
+REVOKE ALL ON TABLE "public"."PatientProfile" FROM anon, authenticated;
+REVOKE ALL ON TABLE "public"."CaregiverProfile" FROM anon, authenticated;
+REVOKE ALL ON TABLE "public"."FamilyInvitation" FROM anon, authenticated;
+REVOKE ALL ON TABLE "public"."FamilyMembership" FROM anon, authenticated;
+REVOKE ALL ON TABLE "public"."ConsentRecord" FROM anon, authenticated;
 
 -- Allow authenticated users appropriate read/update access
 GRANT SELECT, UPDATE ON TABLE "public"."PatientProfile" TO authenticated;
 GRANT SELECT, UPDATE ON TABLE "public"."CaregiverProfile" TO authenticated;
-GRANT SELECT, UPDATE ON TABLE "public"."FamilyInvitation" TO authenticated;
+
+-- Protect invitation secret tokens and OTP codes from browser select (grant safe columns only)
+GRANT SELECT (
+  id, "patientProfileId", "invitedByUserId", "relationship",
+  "inviteeEmail", "inviteePhone", status, "expiresAt",
+  "acceptedAt", "revokedAt", "createdAt", "updatedAt"
+) ON TABLE "public"."FamilyInvitation" TO authenticated;
+GRANT UPDATE (status, "revokedAt", "updatedAt") ON TABLE "public"."FamilyInvitation" TO authenticated;
+
 GRANT SELECT, UPDATE ON TABLE "public"."FamilyMembership" TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON TABLE "public"."ConsentRecord" TO authenticated;
 

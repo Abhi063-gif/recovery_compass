@@ -26,18 +26,96 @@
 -- ============================================================
 
 -- ── Step 0: Helper function for unified user identity extraction ──
+-- Resolves custom public.User text IDs from Supabase Auth or custom JWT claims
+-- Handles:
+-- 1. Custom NestJS JWTs (sub claim containing public.User.id)
+-- 2. Supabase Auth sessions where auth.uid() matches public.User.id
+-- 3. Supabase Auth sessions where user_metadata contains user_id
+-- 4. Supabase Auth sessions mapped via verified email or phone
 CREATE OR REPLACE FUNCTION public.requesting_user_id()
 RETURNS text
-LANGUAGE sql STABLE
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
-  SELECT coalesce(
+DECLARE
+  v_sub text;
+  v_uid uuid;
+  v_claims jsonb;
+  v_email text;
+  v_phone text;
+  v_resolved_id text;
+BEGIN
+  -- Extract raw JWT claims if present
+  BEGIN
+    v_claims := nullif(current_setting('request.jwt.claims', true), '')::jsonb;
+  EXCEPTION WHEN OTHERS THEN
+    v_claims := NULL;
+  END;
+
+  -- 1. Direct 'sub' or metadata extraction from JWT
+  v_sub := coalesce(
     nullif(current_setting('request.jwt.claim.sub', true), ''),
-    (auth.uid())::text
+    v_claims ->> 'sub',
+    v_claims -> 'user_metadata' ->> 'user_id',
+    v_claims -> 'app_metadata' ->> 'user_id'
   );
+
+  -- 2. If v_sub directly matches a public.User.id, return immediately
+  IF v_sub IS NOT NULL THEN
+    SELECT id INTO v_resolved_id FROM public."User" WHERE id = v_sub;
+    IF v_resolved_id IS NOT NULL THEN
+      RETURN v_resolved_id;
+    END IF;
+  END IF;
+
+  -- 3. Check Supabase auth.uid()
+  BEGIN
+    v_uid := auth.uid();
+  EXCEPTION WHEN OTHERS THEN
+    v_uid := NULL;
+  END;
+
+  IF v_uid IS NOT NULL THEN
+    -- Check if public.User.id directly matches auth.uid()
+    SELECT id INTO v_resolved_id FROM public."User" WHERE id = v_uid::text;
+    IF v_resolved_id IS NOT NULL THEN
+      RETURN v_resolved_id;
+    END IF;
+
+    -- Resolve via email mapping from auth.jwt() or auth.users
+    v_email := coalesce(
+      v_claims ->> 'email',
+      (SELECT email FROM auth.users WHERE id = v_uid)
+    );
+
+    IF v_email IS NOT NULL THEN
+      SELECT id INTO v_resolved_id FROM public."User" WHERE lower(email) = lower(v_email);
+      IF v_resolved_id IS NOT NULL THEN
+        RETURN v_resolved_id;
+      END IF;
+    END IF;
+
+    -- Resolve via phone mapping from auth.jwt() or auth.users
+    v_phone := coalesce(
+      v_claims ->> 'phone',
+      (SELECT phone FROM auth.users WHERE id = v_uid)
+    );
+
+    IF v_phone IS NOT NULL THEN
+      SELECT id INTO v_resolved_id FROM public."User" WHERE phone = v_phone;
+      IF v_resolved_id IS NOT NULL THEN
+        RETURN v_resolved_id;
+      END IF;
+    END IF;
+  END IF;
+
+  -- 4. Safe fallback: return v_sub (or NULL if unauthenticated)
+  RETURN v_sub;
+END;
 $$;
 
 COMMENT ON FUNCTION public.requesting_user_id IS
-  'Extracts the requesting user UUID as text from either auth.uid() or the JWT sub claim.';
+  'Securely resolves public.User text ID from custom JWT claims, auth.uid(), or verified email/phone mapping.';
 
 -- ── Step 1: Enable Row Level Security ─────────────────────────
 ALTER TABLE "public"."User" ENABLE ROW LEVEL SECURITY;

@@ -42,15 +42,19 @@ DROP POLICY IF EXISTS "deny_direct_browser_access" ON "public"."ExtractionField"
 DROP POLICY IF EXISTS "deny_direct_browser_access" ON "public"."ProcessingJob";
 
 -- ── Step 4: Privilege Grants / Revocations ────────────────────
-REVOKE ALL ON TABLE "public"."Extraction" FROM anon;
+REVOKE ALL ON TABLE "public"."Extraction" FROM anon, authenticated;
 REVOKE ALL ON TABLE "public"."ExtractionField" FROM anon;
 REVOKE ALL ON TABLE "public"."ProcessingJob" FROM anon;
 
--- Protect raw LLM output from ordinary API queries (audit-only)
-REVOKE SELECT (rawLlmOutput) ON TABLE "public"."Extraction" FROM authenticated;
+-- Protect raw LLM output from ordinary API queries (grant safe columns only)
+GRANT SELECT (
+  id, "documentId", "patientProfileId", "planId", "modelVersion",
+  status, "fieldCount", "confidenceSummary", "confirmedAt",
+  "confirmedByUserId", "createdAt", "updatedAt"
+) ON TABLE "public"."Extraction" TO authenticated;
+GRANT UPDATE (status, "confirmedAt", "confirmedByUserId", "updatedAt") ON TABLE "public"."Extraction" TO authenticated;
 
--- Ordinary authenticated users can read extractions and edit/confirm extracted fields
-GRANT SELECT, UPDATE ON TABLE "public"."Extraction" TO authenticated;
+-- Extraction fields can be read and edited during human verification
 GRANT SELECT, UPDATE ON TABLE "public"."ExtractionField" TO authenticated;
 -- Processing jobs are strictly read-only for clients to poll status
 GRANT SELECT ON TABLE "public"."ProcessingJob" TO authenticated;
