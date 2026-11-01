@@ -111,12 +111,25 @@ export class SyncService {
           }
         }
       } else if (entity === 'asha_visit' && (action === 'CREATE' || action === 'UPDATE')) {
+        const bloodPressureSystolic = payload.vitals?.bloodPressureSystolic ?? payload.bloodPressureSystolic;
+        const bloodPressureDiastolic = payload.vitals?.bloodPressureDiastolic ?? payload.bloodPressureDiastolic;
+        const bloodPressure = (bloodPressureSystolic && bloodPressureDiastolic)
+          ? `${bloodPressureSystolic}/${bloodPressureDiastolic}`
+          : payload.vitals?.bloodPressure || payload.bloodPressure || null;
+
+        const temperatureFahrenheit = payload.vitals?.temperatureFahrenheit ?? payload.vitals?.temperature ?? payload.temperature;
+        const blisterPackCount = payload.blisterPillsRemaining ?? payload.remainingPillCount ?? payload.blisterPackCount ?? payload.pillCount;
+        const notes = payload.notes || payload.medicationNotes || 'Recorded via offline sync push';
+
         const vitals = {
-          bloodPressureSystolic: payload.vitals?.bloodPressureSystolic,
-          bloodPressureDiastolic: payload.vitals?.bloodPressureDiastolic,
-          temperatureFahrenheit: payload.vitals?.temperatureFahrenheit,
-          bloodGlucoseMgDl: payload.vitals?.bloodGlucoseMgDl,
-          pulseBpm: payload.vitals?.pulseBpm,
+          bloodPressure,
+          bloodPressureSystolic,
+          bloodPressureDiastolic,
+          temperatureFahrenheit,
+          bloodGlucoseMgDl: payload.vitals?.bloodGlucoseMgDl ?? payload.bloodGlucoseMgDl,
+          pulseBpm: payload.vitals?.pulseBpm ?? payload.pulseBpm,
+          blisterPackCount,
+          notes,
         };
 
         if (this.communityService) {
@@ -125,11 +138,11 @@ export class SyncService {
               patientId: payload.patientId || 'unknown-patient',
               visitDate: payload.visitDate || mutation.clientTimestamp || new Date().toISOString(),
               medicationVerified: payload.medicationVerified ?? false,
-              medicationNotes: payload.medicationNotes,
-              remainingPillCount: payload.remainingPillCount ?? payload.blisterPillsRemaining,
+              medicationNotes: notes,
+              remainingPillCount: blisterPackCount,
               sideEffectsReported: payload.sideEffectsReported || payload.redFlagsIdentified || [],
               vitals,
-              notes: payload.notes || payload.medicationNotes || 'Recorded via offline sync push',
+              notes,
             },
             userId,
           );
@@ -141,19 +154,23 @@ export class SyncService {
             action: 'ASHA_VISIT_LOGGED',
             resourceType: 'PatientVisit',
             resourceId: payload.patientId || mutation.id,
+            planId: payload.planId,
             metadata: {
               mutationId: mutation.id,
               patientId: payload.patientId,
+              visitDate: payload.visitDate || mutation.clientTimestamp || new Date().toISOString(),
               vitals,
-              medicationVerified: payload.medicationVerified,
-              remainingPillCount: payload.remainingPillCount,
-              notes: payload.notes,
+              bloodPressure,
+              temperature: temperatureFahrenheit,
+              blisterPackCount,
+              medicationVerified: payload.medicationVerified ?? false,
+              notes,
             },
           });
         } catch {
           // Degraded audit fallback
         }
-        this.logger.log(`[Sync] Persisted offline ASHA visit mutation ${mutation.id} for patient ${payload.patientId}`);
+        this.logger.log(`[Sync] Persisted offline ASHA visit mutation ${mutation.id} with vitals for patient ${payload.patientId}`);
       } else if (entity === 'escalation' && (action === 'CREATE' || action === 'UPDATE')) {
         const validRoles: ('ANM' | 'PHC_MEDICAL_OFFICER')[] = ['ANM', 'PHC_MEDICAL_OFFICER'];
         const targetRole = validRoles.includes(payload.targetRole) ? (payload.targetRole as 'ANM' | 'PHC_MEDICAL_OFFICER') : 'ANM';

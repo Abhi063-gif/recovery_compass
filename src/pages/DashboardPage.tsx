@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Calendar,
@@ -25,10 +25,11 @@ import { useAppPreferencesStore } from '@/stores/useAppPreferencesStore';
 import { useSafetyStore } from '@/stores/useSafetyStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useTranslation } from '@/services/i18n';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { plan, toggleTaskStatus, recordMedicationAction, isSyncing } = usePlanStore();
+  const { plan, toggleTaskStatus, recordMedicationAction, applyLiveMedicationUpdate, isSyncing } = usePlanStore();
   const triggerManualEmergency = useSafetyStore((s) => s.triggerManualEmergency);
   const { user } = useAuthStore();
   const { t, speak } = useTranslation();
@@ -40,6 +41,75 @@ export const DashboardPage: React.FC = () => {
   const totalTasksCount = todayTasks.length || 0;
 
   const displayName = user?.firstName || user?.email?.split('@')[0] || 'there';
+
+  // Live dose synchronization: Listen to cross-session updates & Supabase Realtime
+  useEffect(() => {
+    // 1. Storage & Custom Event live dose synchronization
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'rc_live_dose_sync' && e.newValue) {
+        try {
+          const payload = JSON.parse(e.newValue);
+          if (payload.medId && payload.status) {
+            applyLiveMedicationUpdate(payload.medId, payload.status, payload.notes, payload.timestamp);
+          }
+        } catch {
+          // ignore parsing error
+        }
+      }
+    };
+
+    const handleCustomUpdate = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail && detail.medId && detail.status) {
+        applyLiveMedicationUpdate(detail.medId, detail.status, detail.notes, detail.timestamp);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('rc:medication-updated', handleCustomUpdate);
+
+    // 2. Supabase Realtime subscription on public.MedicationEvent
+    let channel: any = null;
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        channel = supabase
+          .channel('realtime:dashboard-medication-events')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'MedicationEvent',
+            },
+            (payload: any) => {
+              const record = (payload.new || payload.old) as any;
+              if (record) {
+                const targetId = record.scheduleId || record.medicationId || record.id;
+                const rawStatus = (record.status || '').toLowerCase();
+                const status = rawStatus === 'taken' ? 'taken' : 'skipped';
+                applyLiveMedicationUpdate(
+                  targetId,
+                  status,
+                  record.notes || 'Caregiver Realtime sync',
+                  record.recordedAt || record.createdAt
+                );
+              }
+            }
+          )
+          .subscribe();
+      } catch (err) {
+        console.warn('Realtime medication events subscription could not be started:', err);
+      }
+    }
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('rc:medication-updated', handleCustomUpdate);
+      if (channel && supabase) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [applyLiveMedicationUpdate]);
 
   // Get the next upcoming follow-up
   const nextFollowUp = plan.followUps && plan.followUps.length > 0
@@ -173,6 +243,114 @@ export const DashboardPage: React.FC = () => {
                 <span>{t('viewAll', 'View All')}</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </Link>
+            </div>
+          </div>
+
+          {/* Today's Medications Section (Live Dose Synchronization) */}
+          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-card space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-rose-50 flex items-center justify-center text-[#C8103E]">
+                  <Pill className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-base text-slate-900">{t('todaysMedications', "Today's Medications")}</h2>
+                  <span className="text-xs text-slate-500 font-medium">
+                    {(plan.medications || []).filter((m) => m.todayStatus === 'taken').length} of {(plan.medications || []).length} taken today
+                  </span>
+                </div>
+              </div>
+              <Link
+                to="/medications"
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition flex items-center gap-1 shrink-0"
+              >
+                <span>{t('viewAll', 'View All')}</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
+            <div className="space-y-2.5">
+              {(plan.medications || []).length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-4">{t('noMedicationsScheduled', 'No medications scheduled for today.')}</p>
+              ) : (
+                plan.medications.map((med) => {
+                  const isTaken = med.todayStatus === 'taken';
+                  const isSkipped = med.todayStatus === 'skipped';
+                  const lastHistory = med.history?.[0];
+                  const isCaregiverConfirmed =
+                    isTaken &&
+                    (lastHistory?.notes?.toLowerCase().includes('caregiver') ||
+                      lastHistory?.notes?.toLowerCase().includes('family'));
+
+                  return (
+                    <div
+                      key={med.id}
+                      className={`p-4 rounded-2xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                        isTaken
+                          ? 'bg-emerald-50/50 border-emerald-200'
+                          : isSkipped
+                          ? 'bg-slate-100/70 border-slate-200'
+                          : 'bg-slate-50/80 border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                            isTaken
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : isSkipped
+                              ? 'bg-slate-200 text-slate-500'
+                              : 'bg-rose-50 text-[#C8103E]'
+                          }`}
+                        >
+                          <Pill className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs sm:text-sm font-bold text-slate-900">
+                              {med.name} {med.dose}{med.unit}
+                            </span>
+                            {isCaregiverConfirmed && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                                Caregiver Confirmed
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[11px] text-slate-500 block">
+                            {med.timing} • {med.frequency}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => recordMedicationAction(med.id, 'skipped')}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                            isSkipped
+                              ? 'bg-slate-300 text-slate-900 font-bold'
+                              : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                          }`}
+                        >
+                          {t('skip', 'Skip')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => recordMedicationAction(med.id, 'taken')}
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                            isTaken
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-rose-700 hover:bg-rose-800 text-white shadow-sm'
+                          }`}
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>{isTaken ? t('taken', 'Taken') + ' ✓' : t('takeMedicine', 'Take')}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
 

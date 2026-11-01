@@ -16,7 +16,7 @@ import { documentsApi } from '@/api/documents';
 import { extractionApi } from '@/api/extraction';
 import { medicationsApi } from '@/api/medications';
 import { questionsApi } from '@/api/questions';
-import { offlineStorage } from '@/services/offlineSync';
+import { offlineStorage, sanitizePlanForOfflineStorage } from '@/services/offlineSync';
 
 const SNAPSHOT_STORAGE_KEY = 'rc_recovery_plan_snapshot';
 const DEMO_MODE = (import.meta as any).env?.VITE_DEMO_MODE === 'true';
@@ -79,6 +79,12 @@ interface PlanState {
     status: 'taken' | 'skipped',
     notes?: string,
   ) => Promise<void>;
+  applyLiveMedicationUpdate: (
+    scheduleOrMedId: string,
+    status: 'taken' | 'skipped' | 'pending' | 'scheduled',
+    notes?: string,
+    recordedAt?: string,
+  ) => void;
 
   // Doctor Questions
   addDoctorQuestion: (questionText: string, reason?: string) => Promise<void>;
@@ -132,41 +138,114 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   },
 
   startDocProcessing: async (onComplete) => {
-    set({ isProcessingDoc: true, processingStage: 1, processingStageLabel: 'Quality check & resolution analysis' });
+    set({
+      isProcessingDoc: true,
+      processingStage: 1,
+      processingStageLabel: 'Uploading document and initiating security checks',
+    });
 
+    let targetDocId = get().uploadedDocumentId;
     const currentFile = get().uploadedFile?.fileObj;
 
-    if (currentFile) {
+    if (currentFile && !targetDocId) {
       try {
-        // Attempt backend document upload
         const uploadRes = await documentsApi.upload(currentFile);
-        if (uploadRes && uploadRes.documentId) {
-          set({ uploadedDocumentId: uploadRes.documentId });
-          await documentsApi.triggerProcessing(uploadRes.documentId);
+        targetDocId = uploadRes?.documentId || uploadRes?.id || null;
+        if (targetDocId) {
+          set({ uploadedDocumentId: targetDocId });
+          await documentsApi.triggerProcessing(targetDocId);
         }
       } catch (err) {
-        console.warn('Backend document upload skipped, proceeding with deterministic simulated pipeline:', err);
+        console.warn('Backend document upload skipped or offline:', err);
+      }
+    } else if (targetDocId) {
+      try {
+        await documentsApi.triggerProcessing(targetDocId);
+      } catch (err) {
+        console.warn('Backend document triggerProcessing skipped or offline:', err);
       }
     }
 
-    const stages = [
-      { delay: 600, label: 'Quality analysis & contrast check passed' },
-      { delay: 1200, label: 'OCR reading text layout & structured pages' },
-      { delay: 1800, label: 'Clinical entity extraction (meds, diet, follow-ups)' },
-      { delay: 2400, label: 'Schema validation & RxNorm verification' },
-      { delay: 3000, label: 'Ready for patient verification' },
-    ];
+    if (!targetDocId) {
+      // Offline fallback: set stage and complete after brief fallback
+      set({
+        isProcessingDoc: false,
+        processingStage: 6,
+        processingStageLabel: 'Ready for patient verification',
+      });
+      get().saveOfflineSnapshot();
+      onComplete();
+      return;
+    }
 
-    stages.forEach((stage, idx) => {
-      setTimeout(() => {
-        set({ processingStage: idx + 2, processingStageLabel: stage.label });
-        if (idx === stages.length - 1) {
-          set({ isProcessingDoc: false });
+    // Poll documentsApi.getStatus(targetDocId) at 2s intervals until status reaches NEEDS_REVIEW or CONFIRMED
+    const STAGE_STATUS_MAP: Record<string, { stage: number; label: string }> = {
+      PENDING: { stage: 1, label: 'Document queued for processing' },
+      QUALITY_ANALYSIS: { stage: 2, label: 'Checking document quality & resolution' },
+      QUALITY_FAILED: { stage: 2, label: 'Document quality check failed' },
+      OCR_PROCESSING: { stage: 3, label: 'Reading document text (OCR)' },
+      OCR_DONE: { stage: 4, label: 'OCR reading complete' },
+      EXTRACTING: { stage: 4, label: 'Extracting clinical instructions (AI)' },
+      EXTRACTION_DONE: { stage: 5, label: 'Validating against medical schema' },
+      NEEDS_REVIEW: { stage: 6, label: 'Ready for patient verification' },
+      CONFIRMED: { stage: 6, label: 'Ready for patient verification' },
+    };
+
+    const pollIntervalMs = 2000;
+    const maxAttempts = 60; // 120s timeout
+    let attempts = 0;
+
+    const poll = async (): Promise<void> => {
+      attempts++;
+      try {
+        const doc = await documentsApi.getStatus(targetDocId!);
+        const currentStatus = doc?.status;
+        const stageInfo = currentStatus ? STAGE_STATUS_MAP[currentStatus] : null;
+
+        if (stageInfo) {
+          set({ processingStage: stageInfo.stage, processingStageLabel: stageInfo.label });
+        }
+
+        if (currentStatus === 'NEEDS_REVIEW' || currentStatus === 'CONFIRMED') {
+          set({
+            isProcessingDoc: false,
+            processingStage: 6,
+            processingStageLabel: 'Ready for patient verification',
+          });
           get().saveOfflineSnapshot();
           onComplete();
+          return;
         }
-      }, stage.delay);
-    });
+
+        if (currentStatus === 'QUALITY_FAILED') {
+          set({
+            isProcessingDoc: false,
+            processingStage: 2,
+            processingStageLabel: 'Document quality check failed',
+          });
+          return;
+        }
+      } catch (pollErr) {
+        console.warn('Error polling document status:', pollErr);
+      }
+
+      if (attempts >= maxAttempts) {
+        console.warn('Polling document status timed out after 120s');
+        set({
+          isProcessingDoc: false,
+          processingStage: 6,
+          processingStageLabel: 'Ready for patient verification',
+        });
+        get().saveOfflineSnapshot();
+        onComplete();
+        return;
+      }
+
+      setTimeout(poll, pollIntervalMs);
+    };
+
+    // Initiate first poll after 2s interval
+    setTimeout(poll, pollIntervalMs);
   },
 
   setSelectedExtractionId: (id) => set({ selectedExtractionId: id }),
@@ -286,25 +365,69 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     get().saveOfflineSnapshot();
   },
 
-  recordMedicationAction: async (medId, status, notes) => {
-    const now = new Date().toISOString();
+  applyLiveMedicationUpdate: (scheduleOrMedId, status, notes, recordedAt) => {
+    const timestamp = recordedAt || new Date().toISOString();
+    const normalizedStatus: 'taken' | 'skipped' | 'pending' =
+      status === 'taken' ? 'taken' : status === 'skipped' ? 'skipped' : 'pending';
 
-    // 1. Optimistic update
     set((state) => ({
       plan: {
         ...state.plan,
         medications: state.plan.medications.map((m) => {
-          if (m.id === medId || (m as any).schedules?.some((s: any) => s.id === medId)) {
+          const isMatch =
+            m.id === scheduleOrMedId ||
+            (m as any).scheduleId === scheduleOrMedId ||
+            (m as any).schedules?.some((s: any) => s.id === scheduleOrMedId) ||
+            m.name.toLowerCase() === scheduleOrMedId.toLowerCase();
+
+          if (isMatch) {
             return {
               ...m,
-              todayStatus: status,
-              history: [{ timestamp: now, status, notes }, ...m.history],
+              todayStatus: normalizedStatus,
+              history: [
+                {
+                  timestamp,
+                  status: normalizedStatus === 'taken' ? 'taken' : 'skipped',
+                  notes: notes || 'Live dose update',
+                },
+                ...(m.history || []).filter(
+                  (h) => Math.abs(new Date(h.timestamp).getTime() - new Date(timestamp).getTime()) > 1000
+                ),
+              ],
             };
           }
           return m;
         }),
       },
     }));
+
+    get().saveOfflineSnapshot();
+  },
+
+  recordMedicationAction: async (medId, status, notes) => {
+    const now = new Date().toISOString();
+
+    // 1. Immediate optimistic update across the session
+    get().applyLiveMedicationUpdate(medId, status, notes, now);
+
+    // 2. Broadcast cross-session and cross-tab via CustomEvent and Storage
+    if (typeof window !== 'undefined') {
+      try {
+        window.dispatchEvent(
+          new CustomEvent('rc:medication-updated', {
+            detail: { medId, status, notes, timestamp: now },
+          })
+        );
+        localStorage.setItem(
+          'rc_live_dose_sync',
+          JSON.stringify({ medId, status, notes, timestamp: now })
+        );
+      } catch {
+        // Fallback in storage-restricted environments
+      }
+    }
+
+    // 3. Optimistic state already set via applyLiveMedicationUpdate above
 
     // Find the target medication and resolve a valid schedule ID
     const med = get().plan.medications.find(
@@ -506,8 +629,9 @@ export const usePlanStore = create<PlanState>((set, get) => ({
 
   saveOfflineSnapshot: () => {
     try {
+      const cleanPlan = sanitizePlanForOfflineStorage(get().plan);
       const snapshot = {
-        plan: get().plan,
+        plan: cleanPlan,
         activeTimelineDay: get().activeTimelineDay,
         savedAt: new Date().toISOString(),
       };
@@ -573,3 +697,46 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     get().saveOfflineSnapshot();
   },
 }));
+
+
+// Cross-tab / cross-window live dose synchronization listener
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (event) => {
+    if (event.key === "rc_live_dose_sync" && event.newValue) {
+      try {
+        const payload = JSON.parse(event.newValue);
+        if (payload.medId && payload.status) {
+          usePlanStore.getState().applyLiveMedicationUpdate(
+            payload.medId,
+            payload.status,
+            payload.notes,
+            payload.timestamp
+          );
+        }
+      } catch {
+        // ignore json parsing errors
+      }
+    }
+
+    if (event.key === "rc_family_revocation" && event.newValue) {
+      try {
+        const payload = JSON.parse(event.newValue);
+        window.dispatchEvent(new CustomEvent("rc:caregiver-revoked", { detail: payload }));
+      } catch {
+        // ignore
+      }
+    }
+  });
+
+  window.addEventListener("rc:medication-updated", ((event: CustomEvent) => {
+    const detail = event.detail;
+    if (detail && detail.medId && detail.status) {
+      usePlanStore.getState().applyLiveMedicationUpdate(
+        detail.medId,
+        detail.status,
+        detail.notes,
+        detail.timestamp
+      );
+    }
+  }) as EventListener);
+}

@@ -12,6 +12,7 @@ export interface LogSymptomPayload {
   painScore?: number;
   temperature?: number;
   symptomDefinitionId?: string;
+  symptomCodes?: string[];
   customSymptom?: string;
   notes?: string;
   recordedAt?: string;

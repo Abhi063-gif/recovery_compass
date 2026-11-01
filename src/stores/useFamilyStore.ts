@@ -193,6 +193,12 @@ export const useFamilyStore = create<FamilyState>((set, get) => ({
     }));
 
     try {
+      localStorage.setItem('rc_family_revocation', JSON.stringify({ memberId, timestamp: Date.now() }));
+    } catch {
+      // non-blocking local broadcast
+    }
+
+    try {
       await familyApi.revoke(memberId);
     } catch (err) {
       console.warn('Backend revoke failed or offline:', err);

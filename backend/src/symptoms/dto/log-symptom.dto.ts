@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, Min, Max, IsUUID, IsDateString } from 'class-validator';
+import { IsString, IsOptional, IsNumber, Min, Max, IsUUID, IsDateString, IsArray } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class LogSymptomDto {
@@ -15,6 +15,12 @@ export class LogSymptomDto {
   @IsOptional()
   @IsString()
   customSymptom?: string;
+
+  @ApiPropertyOptional({ description: 'Specific structured symptom codes for deterministic red-flag checking' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  symptomCodes?: string[];
 
   @ApiPropertyOptional({ minimum: 0, maximum: 10, description: 'Pain score 0 (none) to 10 (worst)' })
   @IsOptional()

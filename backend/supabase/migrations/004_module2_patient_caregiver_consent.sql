@@ -105,11 +105,10 @@ GRANT SELECT, UPDATE ON TABLE "public"."CaregiverProfile" TO authenticated;
 
 -- Protect invitation secret tokens and OTP codes from browser select (grant safe columns only)
 GRANT SELECT (
-  id, "patientProfileId", "invitedByUserId", "relationship",
-  "inviteeEmail", "inviteePhone", status, "expiresAt",
-  "acceptedAt", "revokedAt", "createdAt", "updatedAt"
+  id, "patientProfileId", "invitedByUserId", email, phone,
+  permissions, status, "expiresAt", "acceptedAt", "declinedAt", "createdAt"
 ) ON TABLE "public"."FamilyInvitation" TO authenticated;
-GRANT UPDATE (status, "revokedAt", "updatedAt") ON TABLE "public"."FamilyInvitation" TO authenticated;
+GRANT UPDATE (status, "declinedAt") ON TABLE "public"."FamilyInvitation" TO authenticated;
 
 GRANT SELECT, UPDATE ON TABLE "public"."FamilyMembership" TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON TABLE "public"."ConsentRecord" TO authenticated;

@@ -16,10 +16,14 @@ export class CommunityController {
 
   @Get('caseload')
   @Roles(UserRole.ASHA, UserRole.ANM, UserRole.ADMIN)
-  @ApiOperation({ summary: 'Get assigned recovery caseload for ASHA/ANM' })
-  async getCaseload(@Req() req: any) {
+  @ApiOperation({ summary: 'Get assigned recovery caseload for ASHA/ANM with optional block/village filtering' })
+  async getCaseload(
+    @Req() req: any,
+    @Query('block') block?: string,
+    @Query('village') village?: string,
+  ) {
     const ashaId = req.user?.id || req.user?.sub || 'asha-demo-worker-01';
-    return this.communityService.getCaseload(ashaId);
+    return this.communityService.getCaseload(ashaId, { block, village });
   }
 
   @Post('visits')

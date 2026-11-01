@@ -11,6 +11,8 @@ import {
   CaregiverPermission,
   InvitationStatus,
   ConsentStatus,
+  NotificationType,
+  NotificationChannel,
 } from '@prisma/client';
 import { randomBytes, createHash } from 'crypto';
 import dayjs from 'dayjs';
@@ -237,7 +239,10 @@ export class FamilyService {
   async revoke(membershipId: string, patientUserId: string) {
     const membership = await this.prisma.familyMembership.findUnique({
       where: { id: membershipId },
-      include: { patientProfile: true },
+      include: {
+        patientProfile: { include: { user: true } },
+        caregiverProfile: { include: { user: true } },
+      },
     });
 
     if (!membership) throw new NotFoundException('Membership not found');
@@ -259,6 +264,26 @@ export class FamilyService {
         revokedBy: patientUserId,
       },
     });
+
+    // Notify caregiver that access has been revoked
+    try {
+      const caregiverUserId = membership.caregiverProfile?.userId;
+      const patientName = `${membership.patientProfile?.user?.firstName || 'Patient'} ${membership.patientProfile?.user?.lastName || ''}`.trim();
+      if (caregiverUserId) {
+        await this.prisma.notification.create({
+          data: {
+            userId: caregiverUserId,
+            type: NotificationType.CAREGIVER_ALERT,
+            channel: NotificationChannel.IN_APP,
+            subject: 'Caregiver Access Revoked',
+            body: `Access to the recovery plan for ${patientName} has been revoked by the patient.`,
+            idempotencyKey: `notif-revoked-${membershipId}-${Date.now()}`,
+          },
+        });
+      }
+    } catch {
+      // Non-blocking notification
+    }
 
     await this.auditService.log({
       actorId: patientUserId,

@@ -69,6 +69,55 @@ describe('PDF Upload, OCR, Redis & BullMQ Pipeline Robustness', () => {
     expect(extractedImages[0].subarray(0, 3)).toEqual(Buffer.from([0xff, 0xd8, 0xff]));
   });
 
+  // ─── Scenario 2b: Scanned PDF without JPEG markers uses raster fallback ───
+  it('Scenario 2b: falls back to raster rendering when extractJpegImagesFromPdf returns 0 images', async () => {
+    // Construct a scanned PDF with an embedded PNG raster image (no JPEG SOI/EOI)
+    const pngMagic = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const fakePng = Buffer.concat([
+      pngMagic,
+      Buffer.alloc(1000, 0x55),
+      Buffer.from([0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82]), // IEND
+    ]);
+
+    const nonJpegScannedPdf = Buffer.concat([
+      Buffer.from(
+        '%PDF-1.4\n' +
+        '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n' +
+        '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n' +
+        '3 0 obj << /Type /Page /Parent 2 0 R /Resources << /XObject << /Im1 4 0 R >> >> >> endobj\n' +
+        `4 0 obj << /Type /XObject /Subtype /Image /Width 100 /Height 100 /Length ${fakePng.length} >>\nstream\n`
+      ),
+      fakePng,
+      Buffer.from(
+        '\nendstream\nendobj\n' +
+        'xref\n0 5\n0000000000 65535 f \n' +
+        'trailer << /Size 5 /Root 1 0 R >>\n' +
+        'startxref\n999\n%%EOF'
+      ),
+    ]);
+
+    // extractJpegImagesFromPdf returns 0 because there are no JPEG markers
+    expect(pdfValidator.extractJpegImagesFromPdf(nonJpegScannedPdf).length).toBe(0);
+
+    const provider = new TesseractProvider(pdfValidator);
+    const parseImageSpy = vi.spyOn(provider, 'parseImage').mockResolvedValue({
+      pages: [{
+        pageNumber: 1,
+        fullText: 'Simulated OCR text from raster fallback image',
+        words: [{ text: 'Simulated', confidence: 0.9, bbox: { x: 0, y: 0, width: 50, height: 10 } }],
+        width: 595,
+        height: 842,
+      }],
+      processingTimeMs: 15,
+      provider: 'tesseract',
+    });
+
+    const result = await provider.parse(nonJpegScannedPdf, 'application/pdf');
+    expect(parseImageSpy).toHaveBeenCalled();
+    expect(result.provider).toBe('tesseract-scanned-pdf');
+    expect(result.pages[0].fullText).toContain('Simulated OCR text');
+  });
+
   // ─── Scenario 3: Empty PDF (0 bytes or tiny buffer) ─────────────────────────
   it('Scenario 3: rejects empty 0-byte file and tiny malformed buffer', async () => {
     // 0-byte file

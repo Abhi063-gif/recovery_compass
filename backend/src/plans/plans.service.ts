@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, ForbiddenException 
 import { PrismaService } from '../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { RecoveryScheduler } from '../scheduler/recovery.scheduler';
+import { DoctorQuestionsService } from '../doctor-questions/doctor-questions.service';
 import { PlanStatus, TaskStatus } from '@prisma/client';
 import { CreatePlanDto } from './dto/create-plan.dto';
 
@@ -11,6 +12,7 @@ export class PlansService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly scheduler: RecoveryScheduler,
+    private readonly doctorQuestionsService: DoctorQuestionsService,
   ) {}
 
   async create(dto: CreatePlanDto, patientProfileId: string, userId: string) {
@@ -136,6 +138,13 @@ export class PlansService {
 
     // Generate tasks and medication schedules via deterministic scheduler
     await this.scheduler.generateSchedule(planId);
+
+    // Auto-generate doctor questions for unclear fields, conflicts & conditional instructions
+    try {
+      await this.doctorQuestionsService.generateForPlan(planId);
+    } catch {
+      // Non-blocking if extraction fields not present
+    }
 
     const confirmed = await this.prisma.recoveryPlan.update({
       where: { id: planId },

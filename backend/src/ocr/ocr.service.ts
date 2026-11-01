@@ -45,20 +45,22 @@ export class OcrService {
         },
       });
 
-      // Create regions for each word with sufficient confidence
-      for (const word of page.words) {
-        if (word.text.trim().length === 0) continue;
+      // Batch insert regions in a single database round-trip
+      const regionData = page.words
+        .filter((word) => word.text && word.text.trim().length > 0)
+        .map((word) => ({
+          pageId: dbPage.id,
+          x: word.bbox.x,
+          y: word.bbox.y,
+          width: word.bbox.width,
+          height: word.bbox.height,
+          text: word.text,
+          confidence: word.confidence,
+        }));
 
-        await this.prisma.documentRegion.create({
-          data: {
-            pageId: dbPage.id,
-            x: word.bbox.x,
-            y: word.bbox.y,
-            width: word.bbox.width,
-            height: word.bbox.height,
-            text: word.text,
-            confidence: word.confidence,
-          },
+      if (regionData.length > 0) {
+        await this.prisma.documentRegion.createMany({
+          data: regionData,
         });
       }
     }

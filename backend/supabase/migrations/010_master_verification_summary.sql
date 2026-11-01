@@ -16,9 +16,45 @@ LEFT JOIN (
   GROUP BY tablename
 ) p ON p.tablename = t.tablename
 WHERE t.schemaname = 'public'
+  AND t.tablename IN (
+    'User', 'RefreshToken', 'OtpCode',
+    'PatientProfile', 'CaregiverProfile', 'FamilyInvitation', 'FamilyMembership', 'ConsentRecord',
+    'SourceDocument', 'DocumentPage', 'DocumentRegion',
+    'Extraction', 'ExtractionField', 'ProcessingJob',
+    'RecoveryPlan', 'PlanVersion', 'RecoveryTask', 'TaskEvent', 'Medication', 'MedicationSchedule', 'MedicationEvent',
+    'PathwayTemplate', 'SymptomDefinition', 'SymptomLog', 'RedFlagRule', 'RedFlagEvent', 'FollowUp', 'PendingTest', 'DoctorQuestion',
+    'Notification', 'NotificationPreference', 'AuditEvent', 'AdminConfiguration', 'DeletionRequest'
+  )
 ORDER BY t.tablename;
 
--- ── 2. Check the 9 Foreign-Key Covering Indexes ──────────────────────────
+-- ── 2. High-Level RLS Health Scorecard (Target: 34 / 34 Protected) ────────
+SELECT 
+  COUNT(*) FILTER (WHERE t.rowsecurity AND COALESCE(p.policy_count, 0) > 0) AS secured_tables_count,
+  34 AS target_tables_count,
+  CASE 
+    WHEN COUNT(*) FILTER (WHERE t.rowsecurity AND COALESCE(p.policy_count, 0) > 0) >= 34 
+    THEN '✅ ALL 34 TABLES SECURED WITH ACTIVE RLS POLICIES' 
+    ELSE '❌ WARNING: INCOMPLETE RLS COVERAGE' 
+  END AS overall_status
+FROM pg_tables t
+LEFT JOIN (
+  SELECT tablename, count(*) AS policy_count
+  FROM pg_policies
+  WHERE schemaname = 'public'
+  GROUP BY tablename
+) p ON p.tablename = t.tablename
+WHERE t.schemaname = 'public'
+  AND t.tablename IN (
+    'User', 'RefreshToken', 'OtpCode',
+    'PatientProfile', 'CaregiverProfile', 'FamilyInvitation', 'FamilyMembership', 'ConsentRecord',
+    'SourceDocument', 'DocumentPage', 'DocumentRegion',
+    'Extraction', 'ExtractionField', 'ProcessingJob',
+    'RecoveryPlan', 'PlanVersion', 'RecoveryTask', 'TaskEvent', 'Medication', 'MedicationSchedule', 'MedicationEvent',
+    'PathwayTemplate', 'SymptomDefinition', 'SymptomLog', 'RedFlagRule', 'RedFlagEvent', 'FollowUp', 'PendingTest', 'DoctorQuestion',
+    'Notification', 'NotificationPreference', 'AuditEvent', 'AdminConfiguration', 'DeletionRequest'
+  );
+
+-- ── 3. Check the 9 Foreign-Key Covering Indexes ──────────────────────────
 SELECT 
   tablename,
   indexname,
@@ -38,3 +74,29 @@ WHERE schemaname = 'public'
   )
 ORDER BY tablename, indexname;
 
+-- ── 4. Sensitive Column Access Lockdown Check (Target: ALL REVOKED) ───────
+SELECT 
+  t.table_name,
+  t.column_name,
+  t.role_tested,
+  CASE 
+    WHEN has_column_privilege(t.role_tested, '"public"."' || t.table_name || '"', t.column_name, 'SELECT') 
+    THEN '❌ LEAKED (Accessible)' 
+    ELSE '✅ REVOKED (Protected)' 
+  END AS select_status
+FROM (
+  VALUES 
+    ('User', 'passwordHash', 'authenticated'),
+    ('User', 'passwordHash', 'anon'),
+    ('FamilyInvitation', 'tokenHash', 'authenticated'),
+    ('FamilyInvitation', 'tokenHash', 'anon'),
+    ('FamilyInvitation', 'otpCode', 'authenticated'),
+    ('FamilyInvitation', 'otpCode', 'anon'),
+    ('RefreshToken', 'tokenHash', 'authenticated'),
+    ('RefreshToken', 'tokenHash', 'anon'),
+    ('OtpCode', 'code', 'authenticated'),
+    ('OtpCode', 'code', 'anon'),
+    ('Extraction', 'rawLlmOutput', 'authenticated'),
+    ('Extraction', 'rawLlmOutput', 'anon')
+) AS t(table_name, column_name, role_tested)
+ORDER BY t.table_name, t.column_name, t.role_tested;

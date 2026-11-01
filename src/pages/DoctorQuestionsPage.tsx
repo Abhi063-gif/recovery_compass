@@ -31,20 +31,26 @@ export const DoctorQuestionsPage: React.FC = () => {
     }
   }, [plan.id]);
 
-  const combinedQuestions = [
-    ...(remoteQuestions.length > 0
-      ? remoteQuestions.map((q) => ({
-          id: q.id,
-          text: q.questionText,
-          answered: q.isResolved,
-          sourceType: q.sourceType,
-        }))
-      : plan.doctorQuestions.map((q) => ({
-          id: q.id,
-          text: q.question,
-          answered: q.isAnswered,
-          sourceType: q.category,
-        }))),
+  // Determine whether real questions exist from remote API or local plan store
+  const hasRemoteQuestions = remoteQuestions.length > 0;
+  const hasPlanQuestions = (plan.doctorQuestions || []).length > 0;
+  const hasRealQuestions = hasRemoteQuestions || hasPlanQuestions;
+
+  const realQuestions = hasRemoteQuestions
+    ? remoteQuestions.map((q) => ({
+        id: q.id,
+        text: q.questionText || q.text,
+        answered: q.isResolved ?? q.answered ?? false,
+        sourceType: q.sourceType,
+      }))
+    : (plan.doctorQuestions || []).map((q) => ({
+        id: q.id,
+        text: q.question,
+        answered: q.isAnswered,
+        sourceType: q.category,
+      }));
+
+  const fallbackQuestions = [
     {
       id: 'default-q-1',
       text: 'Is it safe to resume light core/abdominal exercise after 2 weeks?',
@@ -59,9 +65,12 @@ export const DoctorQuestionsPage: React.FC = () => {
     },
   ];
 
-  // Deduplicate
+  // If real clinical questions exist, do NOT append static dummy fallback questions
+  const combinedQuestions = hasRealQuestions ? realQuestions : fallbackQuestions;
+
+  // Deduplicate strictly by normalized question text
   const uniqueQuestions = Array.from(
-    new Map(combinedQuestions.map((item) => [item.text, item])).values(),
+    new Map(combinedQuestions.map((item) => [item.text.trim().toLowerCase(), item])).values(),
   );
 
   const [questionList, setQuestionList] = useState(uniqueQuestions);

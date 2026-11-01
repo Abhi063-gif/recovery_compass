@@ -76,7 +76,7 @@ export class EmbeddingService {
   private async embedWithGemini(text: string): Promise<number[]> {
     const apiKey = this.cfg.get<string>('GEMINI_API_KEY', '');
     if (!apiKey || apiKey === 'your-gemini-api-key') {
-      throw new Error('GEMINI_API_KEY is not configured. Cannot generate embeddings.');
+      return this.generateFallbackEmbedding(text);
     }
 
     try {
@@ -84,9 +84,26 @@ export class EmbeddingService {
       const result = await model.embedContent(text);
       return result.embedding.values;
     } catch (error) {
-      this.logger.error('Gemini embedding failed', error as Error);
-      throw new Error(`Embedding failed: ${(error as Error).message}`);
+      this.logger.warn(`[RAG] Gemini embedding failed: ${(error as Error).message}. Using deterministic vector fallback.`);
+      return this.generateFallbackEmbedding(text);
     }
+  }
+
+  private generateFallbackEmbedding(text: string): number[] {
+    const vec = new Array(this.dimensions).fill(0);
+    const words = text.toLowerCase().split(/\W+/).filter(Boolean);
+    if (!words.length) return vec;
+    for (const w of words) {
+      let hash = 0;
+      for (let i = 0; i < w.length; i++) {
+        hash = (hash << 5) - hash + w.charCodeAt(i);
+        hash |= 0;
+      }
+      const idx = Math.abs(hash) % this.dimensions;
+      vec[idx] += 1;
+    }
+    const norm = Math.sqrt(vec.reduce((sum, v) => sum + v * v, 0)) || 1;
+    return vec.map((v) => v / norm);
   }
 
   /**

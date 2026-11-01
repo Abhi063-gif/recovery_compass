@@ -220,10 +220,26 @@ export class AuthService {
     });
   }
 
-  async getProfile(userId: string): Promise<{ userId: string; email: string; role: string; firstName: string; lastName: string }> {
+  async getProfile(userId: string): Promise<{
+    userId: string;
+    email: string;
+    role: string;
+    firstName: string;
+    lastName: string;
+    patientProfileId?: string;
+    caregiverProfileId?: string;
+  }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, role: true, firstName: true, lastName: true },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        firstName: true,
+        lastName: true,
+        patientProfile: { select: { id: true } },
+        caregiverProfile: { select: { id: true } },
+      },
     });
     if (!user) {
       throw new UnauthorizedException('User not found');
@@ -234,6 +250,8 @@ export class AuthService {
       role: user.role,
       firstName: user.firstName,
       lastName: user.lastName,
+      patientProfileId: user.patientProfile?.id,
+      caregiverProfileId: user.caregiverProfile?.id,
     };
   }
 

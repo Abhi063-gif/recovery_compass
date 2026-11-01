@@ -30,12 +30,14 @@ export class ApiError extends Error {
 export interface RequestOptions extends RequestInit {
   params?: Record<string, string | number | boolean | undefined>;
   skipAuth?: boolean;
+  _isRetry?: boolean;
 }
 
 class ApiClient {
   private baseUrl: string;
   private tokenKey = 'recovery_compass_access_token';
   private refreshTokenKey = 'recovery_compass_refresh_token';
+  private refreshPromise: Promise<string | null> | null = null;
 
   constructor() {
     const metaEnv = (import.meta as { env?: Record<string, string> }).env;
@@ -48,6 +50,55 @@ class ApiClient {
     } catch {
       return null;
     }
+  }
+
+  public getRefreshToken(): string | null {
+    try {
+      return localStorage.getItem(this.refreshTokenKey);
+    } catch {
+      return null;
+    }
+  }
+
+  private async performTokenRefresh(refreshToken: string): Promise<string | null> {
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.refreshPromise = (async () => {
+      try {
+        const refreshUrl = `${this.baseUrl}/auth/refresh`;
+        const res = await fetch(refreshUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Request-ID': this.generateRequestId(),
+          },
+          body: JSON.stringify({ refreshToken }),
+        });
+
+        if (!res.ok) {
+          this.clearTokens();
+          return null;
+        }
+
+        const data = await res.json();
+        const payload = data && 'data' in data ? data.data : data;
+        if (payload?.accessToken) {
+          this.setTokens(payload.accessToken, payload.refreshToken);
+          return payload.accessToken as string;
+        }
+        this.clearTokens();
+        return null;
+      } catch {
+        this.clearTokens();
+        return null;
+      } finally {
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
   }
 
   public setTokens(accessToken: string, refreshToken?: string): void {
@@ -131,6 +182,30 @@ class ApiClient {
       }
 
       if (!response.ok) {
+        if (
+          response.status === 401 &&
+          !options._isRetry &&
+          !options.skipAuth &&
+          !endpoint.includes('/auth/login') &&
+          !endpoint.includes('/auth/register') &&
+          !endpoint.includes('/auth/refresh')
+        ) {
+          const refreshToken = this.getRefreshToken();
+          if (refreshToken) {
+            const newAccessToken = await this.performTokenRefresh(refreshToken);
+            if (newAccessToken) {
+              return this.request<T>(endpoint, {
+                ...options,
+                _isRetry: true,
+                headers: {
+                  ...headers,
+                  Authorization: `Bearer ${newAccessToken}`,
+                },
+              });
+            }
+          }
+        }
+
         const errorPayload: ApiErrorPayload = data?.error || {
           code: `HTTP_${response.status}`,
           message: data?.message || response.statusText || 'Request failed',

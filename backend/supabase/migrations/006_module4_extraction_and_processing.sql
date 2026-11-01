@@ -48,11 +48,10 @@ REVOKE ALL ON TABLE "public"."ProcessingJob" FROM anon;
 
 -- Protect raw LLM output from ordinary API queries (grant safe columns only)
 GRANT SELECT (
-  id, "documentId", "patientProfileId", "planId", "modelVersion",
-  status, "fieldCount", "confidenceSummary", "confirmedAt",
-  "confirmedByUserId", "createdAt", "updatedAt"
+  id, "documentId", status, "llmModel", "llmVersion", "schemaVersion",
+  "confirmedAt", "confirmedBy", "createdAt", "updatedAt"
 ) ON TABLE "public"."Extraction" TO authenticated;
-GRANT UPDATE (status, "confirmedAt", "confirmedByUserId", "updatedAt") ON TABLE "public"."Extraction" TO authenticated;
+GRANT UPDATE (status, "confirmedAt", "confirmedBy", "updatedAt") ON TABLE "public"."Extraction" TO authenticated;
 
 -- Extraction fields can be read and edited during human verification
 GRANT SELECT, UPDATE ON TABLE "public"."ExtractionField" TO authenticated;

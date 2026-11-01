@@ -7,16 +7,24 @@ export interface PathwayTemplate {
   description: string;
   version: number;
   isActive: boolean;
+  supportedCategories?: string[];
+  schedulingRules?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface RedFlagAdminRule {
   id: string;
   ruleCode: string;
   name: string;
+  description?: string;
+  triggerType?: string;
+  triggerConfig?: Record<string, unknown>;
   severity: string;
   action: string;
+  messageTemplate?: string;
+  emergencyMessage?: string;
   status: string;
-  reviewNote: string;
+  reviewNote?: string;
 }
 
 export const adminApi = {
@@ -36,7 +44,11 @@ export const adminApi = {
     return apiClient.get<RedFlagAdminRule[]>('/admin/red-flags');
   },
 
-  createRedFlag: async (data: Partial<RedFlagAdminRule>): Promise<RedFlagAdminRule> => {
+  createRedFlag: async (data: Partial<RedFlagAdminRule> | any): Promise<RedFlagAdminRule> => {
+    return apiClient.post<RedFlagAdminRule>('/admin/red-flags', data);
+  },
+
+  createRedFlagRule: async (data: Partial<RedFlagAdminRule> | any): Promise<RedFlagAdminRule> => {
     return apiClient.post<RedFlagAdminRule>('/admin/red-flags', data);
   },
 

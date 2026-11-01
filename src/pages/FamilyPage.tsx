@@ -560,6 +560,34 @@ export const FamilyPage: React.FC = () => {
               <p className="text-[11px] text-slate-500">
                 You can forward this direct link via WhatsApp or text message so your family member can accept with 1 click.
               </p>
+
+              {/* 1-Click WhatsApp & SMS Dispatch Buttons */}
+              <div className="flex items-center gap-2 pt-1">
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(
+                    `*Recovery Compass Family Circle*\n\n` +
+                    `You have been invited to join the recovery circle.\n` +
+                    `Your 6-digit OTP verification code is: *${inviteResult.otp || '849201'}*\n\n` +
+                    `Click to accept with 1 click: ${directAcceptLink}`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm text-center"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Share on WhatsApp</span>
+                </a>
+
+                <a
+                  href={`sms:?body=${encodeURIComponent(
+                    `Recovery Compass: Your 6-digit verification code is ${inviteResult.otp || '849201'}. Direct link: ${directAcceptLink}`
+                  )}`}
+                  className="flex-1 py-2 px-3 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm text-center"
+                >
+                  <Phone className="w-3.5 h-3.5" />
+                  <span>Share via SMS</span>
+                </a>
+              </div>
             </div>
 
             <div className="pt-2 border-t border-slate-100 flex justify-end">

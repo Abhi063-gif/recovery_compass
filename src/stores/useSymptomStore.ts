@@ -63,6 +63,7 @@ export const useSymptomStore = create<SymptomState>((set) => ({
         planId,
         painScore: newEntry.painScore,
         temperature: newEntry.temperature,
+        symptomCodes: newEntry.selectedSymptoms,
         customSymptom: newEntry.selectedSymptoms.join(', ') || newEntry.customSymptom,
         notes: newEntry.notes,
       });

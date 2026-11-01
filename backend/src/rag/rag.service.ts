@@ -130,12 +130,6 @@ export class RagService {
     // Generate embeddings and store
     await this.vectorStore.storeChunks(documentId, chunks);
 
-    // Update document record with chunk count
-    await this.prisma.sourceDocument.update({
-      where: { id: documentId },
-      data: { chunkCount: chunks.length } as any,
-    });
-
     this.logger.log(`[RAG] Indexing complete for document ${documentId}: ${chunks.length} chunks indexed`);
   }
 

@@ -29,6 +29,13 @@ export class SymptomsService {
       },
     });
 
+    // Extract structured symptom codes
+    const symptomCodes = dto.symptomCodes && dto.symptomCodes.length > 0
+      ? dto.symptomCodes
+      : dto.customSymptom
+      ? dto.customSymptom.split(',').map((s) => s.trim())
+      : [];
+
     // ─── Run deterministic red-flag check after every symptom log ─────────
     const safetyResult = await this.redFlagEngine.evaluate(
       dto.planId,
@@ -36,6 +43,8 @@ export class SymptomsService {
       {
         painScore: dto.painScore,
         temperature: dto.temperature,
+        symptomCodes,
+        customSymptom: dto.customSymptom,
         notes: dto.notes,
       },
       userId,

@@ -6,6 +6,8 @@
  * - Outbox pattern for offline mutations with client UUIDs
  * - Idempotent sync push to POST /sync/push
  * - Delta pull from GET /sync/pull
+ * - Mobile browser quota protection: strips uncompressed document PDF buffers
+ *   and base64 payloads; stores compressed JSON plan state only.
  */
 
 const DB_NAME = 'RecoveryCompassOfflineDB';
@@ -17,6 +19,107 @@ export interface OutboxMutation {
   action: 'CREATE' | 'UPDATE' | 'DELETE';
   payload: any;
   clientTimestamp: string;
+}
+
+/**
+ * Strips uncompressed document PDF buffers and base64 payloads to preserve mobile IndexedDB quotas.
+ * Retains only metadata (e.g. document name, page count, size) and pure clinical JSON state.
+ */
+export function sanitizePlanForOfflineStorage(obj: any): any {
+  if (!obj || typeof obj !== 'object') return obj;
+
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizePlanForOfflineStorage);
+  }
+
+  const sanitized: Record<string, any> = {};
+  for (const [key, val] of Object.entries(obj)) {
+    // Drop raw files, binary objects, and raw document strings
+    if (
+      [
+        'fileObj',
+        'pdfBase64',
+        'rawPdf',
+        'pdfBuffer',
+        'blob',
+        'rawLlmOutput',
+        'base64Content',
+        'rawContent',
+        'imageData',
+      ].includes(key)
+    ) {
+      continue;
+    }
+
+    // If string is a base64 data URL (e.g. data:application/pdf;base64,...), drop the heavy content
+    if (typeof val === 'string') {
+      if (val.startsWith('data:application/pdf') || (val.startsWith('data:') && val.length > 512)) {
+        continue;
+      }
+      // If a large pure base64 string (> 5000 chars without spaces), skip
+      if (val.length > 5000 && /^[A-Za-z0-9+/=\r\n]+$/.test(val)) {
+        continue;
+      }
+    }
+
+    // If nested object, recurse
+    if (typeof val === 'object' && val !== null) {
+      // If it's a File or Blob instance, skip
+      if (typeof Blob !== 'undefined' && val instanceof Blob) {
+        continue;
+      }
+      sanitized[key] = sanitizePlanForOfflineStorage(val);
+    } else {
+      sanitized[key] = val;
+    }
+  }
+
+  return sanitized;
+}
+
+/**
+ * Compresses JSON plan state using browser CompressionStream (gzip) where available,
+ * with fallback to minified JSON string.
+ */
+export async function compressJsonState(data: any): Promise<string> {
+  const jsonString = JSON.stringify(data);
+  if (typeof CompressionStream !== 'undefined') {
+    try {
+      const stream = new Blob([jsonString]).stream().pipeThrough(new CompressionStream('gzip'));
+      const buffer = await new Response(stream).arrayBuffer();
+      let binary = '';
+      const bytes = new Uint8Array(buffer);
+      const len = bytes.byteLength;
+      for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return `gz:${btoa(binary)}`;
+    } catch {
+      // Fallback
+    }
+  }
+  return jsonString;
+}
+
+/**
+ * Decompresses gzip-compressed JSON state or parses direct JSON.
+ */
+export async function decompressJsonState(compressed: string): Promise<any> {
+  if (compressed.startsWith('gz:') && typeof DecompressionStream !== 'undefined') {
+    try {
+      const binaryStr = atob(compressed.slice(3));
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
+      const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+      const decompressedText = await new Response(stream).text();
+      return JSON.parse(decompressedText);
+    } catch {
+      // Fallback
+    }
+  }
+  return JSON.parse(compressed);
 }
 
 class OfflineStorageEngine {
@@ -70,16 +173,21 @@ class OfflineStorageEngine {
     return this.initPromise;
   }
 
-  // Queue offline mutation to outbox
+  // Queue offline mutation to outbox (ensuring no raw PDF buffers/base64 are queued)
   async queueMutation(mutation: OutboxMutation): Promise<void> {
+    const cleanMutation: OutboxMutation = {
+      ...mutation,
+      payload: sanitizePlanForOfflineStorage(mutation.payload),
+    };
+
     try {
       const db = await this.getDb();
       const tx = db.transaction('outbox', 'readwrite');
-      tx.objectStore('outbox').put(mutation);
+      tx.objectStore('outbox').put(cleanMutation);
     } catch {
       // Fallback to localStorage if IndexedDB is blocked
       const queue = JSON.parse(localStorage.getItem('rc_offline_outbox') || '[]');
-      queue.push(mutation);
+      queue.push(cleanMutation);
       localStorage.setItem('rc_offline_outbox', JSON.stringify(queue));
     }
   }
@@ -133,24 +241,87 @@ class OfflineStorageEngine {
     }
   }
 
-  // Save current recovery plan locally
+  /**
+   * Save current recovery plan locally.
+   * Strips uncompressed document PDF buffers and base64 strings to respect mobile browser quota limits;
+   * stores compressed JSON plan state only.
+   */
   async savePlanSnapshot(plan: any): Promise<void> {
+    if (!plan) return;
+    const cleanPlan = sanitizePlanForOfflineStorage(plan);
+    const planId = cleanPlan.id || 'current-plan';
+
     try {
+      const compressed = await compressJsonState(cleanPlan);
+      const record = {
+        id: planId,
+        compressedState: compressed,
+        updatedAt: new Date().toISOString(),
+      };
+
       const db = await this.getDb();
       const tx = db.transaction('plans', 'readwrite');
-      tx.objectStore('plans').put(plan);
+      tx.objectStore('plans').put(record);
     } catch {
-      localStorage.setItem('rc_recovery_plan_snapshot', JSON.stringify({ plan, timestamp: Date.now() }));
+      try {
+        localStorage.setItem(
+          'rc_recovery_plan_snapshot',
+          JSON.stringify({ plan: cleanPlan, timestamp: Date.now() })
+        );
+      } catch (err) {
+        console.warn('LocalStorage snapshot quota exceeded:', err);
+      }
+    }
+  }
+
+  /**
+   * Retrieve locally saved recovery plan snapshot from IndexedDB,
+   * decompressing compressed state on retrieval.
+   */
+  async getPlanSnapshot(planId?: string): Promise<any | null> {
+    try {
+      const db = await this.getDb();
+      return new Promise((resolve) => {
+        const tx = db.transaction('plans', 'readonly');
+        const store = tx.objectStore('plans');
+        const req = planId ? store.get(planId) : store.getAll();
+        req.onsuccess = async () => {
+          let item = req.result;
+          if (Array.isArray(item)) {
+            item = item[item.length - 1];
+          }
+          if (item && item.compressedState) {
+            try {
+              const decompressed = await decompressJsonState(item.compressedState);
+              resolve(decompressed);
+              return;
+            } catch {
+              resolve(item);
+              return;
+            }
+          }
+          resolve(item || null);
+        };
+        req.onerror = () => resolve(null);
+      });
+    } catch {
+      try {
+        const raw = localStorage.getItem('rc_recovery_plan_snapshot');
+        return raw ? JSON.parse(raw).plan : null;
+      } catch {
+        return null;
+      }
     }
   }
 
   // Save caseload locally for offline use
   async saveCaseload(caseload: any[]): Promise<void> {
     try {
+      const cleanCaseload = sanitizePlanForOfflineStorage(caseload);
       const db = await this.getDb();
       const tx = db.transaction('caseload', 'readwrite');
       const store = tx.objectStore('caseload');
-      for (const item of caseload) {
+      for (const item of cleanCaseload) {
         store.put(item);
       }
     } catch {
